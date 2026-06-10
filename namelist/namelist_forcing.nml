@@ -1,0 +1,16 @@
+&tebforcing
+forcing_path='input/',
+lon_teb=1.3,
+lat_teb=43.484,
+hlev_teb=28.
+
+teb_year=2004,   
+teb_month=2,     
+teb_day=20,     
+teb_hour=0.,     
+teb_min=0.,
+    
+nsteps=17999,  
+dt=300.,      
+    
+/ 

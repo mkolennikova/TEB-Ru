@@ -1,0 +1,747 @@
+PROGRAM run_teb_offline
+
+USE sfc_teb,        ONLY : teb_interface
+USE MODI_OL_READ_ATM
+USE MODI_OL_TIME_INTERP_ATM
+USE MODD_SURF_PAR, ONLY: XUNDEF
+USE MODD_CSTS,     ONLY : XCPD, XSTEFAN, XPI, XDAY, XKARMAN,   &
+                          XLVTT, XLSTT, XLMTT, XRV, XRD, XG, XP00
+USE MODD_FORC_ATM, ONLY: CSV         ,&! name of all scalar variables
+                         XDIR_ALB    ,&! direct albedo for each band
+                         XSCA_ALB    ,&! diffuse albedo for each band
+                         XEMIS       ,&! emissivity
+                         XTSRAD      ,&! radiative temperature
+                         XTSUN       ,&! solar time (s from midnight)
+                         XZS         ,&! orography               (m)
+                         XZREF       ,&! height of T,q forcing   (m)
+                         XUREF       ,&! height of wind forcing  (m)
+                         XTA         ,&! air temperature forcing (K)
+                         XQA         ,&! air humidity forcing    (kg/m3)
+                         XSV         ,&! scalar variables
+                         XU          ,&! zonal wind              (m/s)
+                         XV          ,&! meridian wind           (m/s)
+                         XDIR_SW     ,&! direct  solar radiation (on horizontal surf.)
+                         XSCA_SW     ,&! diffuse solar radiation (on horizontal surf.)
+                         XSW_BANDS   ,&! mean wavelength of each shortwave band (m)
+                         XZENITH     ,&! zenithal angle  (radian from the vertical)
+                         XZENITH2    ,&! zenithal angle  (radian from the vertical)
+                         XAZIM       ,&! azimuthal angle (radian from North, clockwise)
+                         XLW         ,&! longwave radiation (on horizontal surf.)
+                         XPS         ,&! pressure at atmospheric model surface (Pa)
+                         XPA         ,&! pressure at forcing level      (Pa)
+                         XRHOA       ,&! density at forcing level       (kg/m3)
+                         XCO2        ,&! CO2 concentration in the air   (kg/m3)
+                         XSNOW       ,&! snow precipitation             (kg/m2/s)
+                         XRAIN       ,&! liquid precipitation           (kg/m2/s)
+                         XSFTH       ,&! flux of heat                   (W/m2)
+                         XSFTQ       ,&! flux of water vapor            (kg/m2/s)
+                         XSFU        ,&! zonal momentum flux            (m/s)
+                         XSFV        ,&! meridian momentum flux         (m/s)
+                         XSFCO2      ,&! flux of CO2                    (kg/m2/s)
+                         XSFTS       ,&! flux of scalar var.            (kg/m2/s)
+                         XPEW_A_COEF ,&! implicit coefficients
+                         XPEW_B_COEF ,&!
+                         XPET_A_COEF ,&
+                         XPEQ_A_COEF ,&
+                         XPET_B_COEF ,&
+                         XPEQ_B_COEF
+
+INTEGER :: nsteps                            !IN Number of timesteps
+INTEGER :: JSURF_STEP                        ! Driver loop index
+INTEGER :: INB_ATM                           ! number time the driver calls the TEB
+!                                            ! routines during a forcing time-step
+!                                            ! --> it defines the time-step for TEB
+INTEGER :: nstep                             !IN timestep 
+INTEGER, PARAMETER :: nvec = 1               !IN array dimensions
+INTEGER :: ivstart                           !IN optional start index                  
+INTEGER :: ivend                             !IN optional end   index                  
+INTEGER :: iblock                            !IN number of block             
+
+INTEGER :: teb_year                          !IN Current year (UTC)
+INTEGER :: teb_month                         !IN Current month (UTC)
+INTEGER :: teb_day                           !IN Current day (UTC)
+INTEGER :: teb_hour                          !IN Current hour (UTC)
+INTEGER :: teb_min                           !IN Current minute (UTC)
+INTEGER :: teb_sec                           !IN Current seconds (UTC)
+REAL,DIMENSION(1) :: teb_hour_seconds        !IN Current duration since start of the run(s)
+
+REAL ,DIMENSION(nvec) :: lon_teb             !IN Longitude (deg)				
+REAL ,DIMENSION(nvec) :: lat_teb             !IN Latitude (deg)
+REAL ,DIMENSION(nvec) :: hlev_teb            !IN Atm. Forcing height above roof level
+REAL ,DIMENSION(nvec) :: sa_uc               !IN fraction of urban area (need for AHF_TRAFFIC calculation)   
+REAL, DIMENSION(1)    :: dt                  !IN integration timestep
+
+! Input forcing
+REAL,DIMENSION(nvec) :: u              !IN zonal wind speed
+REAL,DIMENSION(nvec) :: v              !IN meridional wind speed 
+REAL,DIMENSION(nvec) :: t              !IN temperature                            (  K  )
+REAL,DIMENSION(nvec) :: qv             !IN specific water vapor content           (kg/kg)
+REAL,DIMENSION(nvec) :: ps             !IN surface pressure                       ( Pa  )
+REAL,DIMENSION(nvec) :: rho            !IN air density                            ( kg/m3  )
+REAL,DIMENSION(nvec) :: prr_con        !IN precipitation rate of rain, convective       (kg/m2*s)
+REAL,DIMENSION(nvec) :: prs_con        !IN precipitation rate of snow, convective       (kg/m2*s)
+REAL,DIMENSION(nvec) :: prr_gsp        !IN precipitation rate of rain, grid-scale       (kg/m2*s)
+REAL,DIMENSION(nvec) :: prs_gsp        !IN precipitation rate of snow, grid-scale       (kg/m2*s)
+REAL,DIMENSION(nvec) :: prg_gsp        !IN precipitation rate of graupel, grid-scale    (kg/m2*s)
+REAL,DIMENSION(nvec) :: lwd_s          !IN downward comp. of long  wave rad. flux
+REAL,DIMENSION(nvec) :: swdir_s        !IN direct comp. of solar radiative flux at surface 
+REAL,DIMENSION(nvec) :: swdifd_s       !IN diffuse downward comp. of short wave rad. flux
+
+! Input urban parameters
+INTEGER, PARAMETER :: teb_nwall_layer                = 5 !IN number of wall layers      
+INTEGER, PARAMETER :: teb_nroof_layer                = 5 !IN number of roof layers                           
+INTEGER, PARAMETER :: teb_nroad_layer                = 5 !IN number of road layers                   
+INTEGER, PARAMETER :: teb_nfloor_layer               = 5 !IN number of floor layers      
+REAL ,DIMENSION(nvec) :: urb_fr_bld                     !IN Building area fraction with respect to urban tile    (  -  )
+REAL ,DIMENSION(nvec) :: fr_garden                      !IN Garden area fraction with respect to urban tile    (  -  )
+REAL ,DIMENSION(nvec) :: urb_h2w                        !IN Street canyon H/W ratio   ( m/m )
+REAL ,DIMENSION(nvec) :: urb_h_bld                      !IN Building height  (  m  )
+CHARACTER(LEN=4)      :: teb_hroad_dir                  !IN road direction option :                      
+                                                        ! 'UNIF' : uniform roads                       
+                                                        ! 'ORIE' : specified road orientation          
+CHARACTER(LEN=4)      :: teb_wall_opt                   !IN Wall option                                  
+                                                        ! 'UNIF' : uniform walls                       
+									                    ! 'TWO ' : 2 opposite  walls
+REAL,DIMENSION(nvec)  :: teb_road_dir                   !IN road direction (° from North, clockwise)													   
+REAL ,DIMENSION(nvec) :: urb_hcap_rd                    !IN Volumetric heat capacity of road material (Jm-3K-1)
+REAL ,DIMENSION(nvec) :: urb_hcap_rf                    !IN Volumetric heat capacity of roof material (Jm-3K-1)
+REAL ,DIMENSION(nvec) :: urb_hcap_wl                    !IN Volumetric heat capacity of wall material (Jm-3K-1)
+REAL ,DIMENSION(nvec) :: urb_hcon_rd                    !IN heat conductivity of road material
+REAL ,DIMENSION(nvec) :: urb_hcon_rf                    !IN heat conductivity of roof material
+REAL ,DIMENSION(nvec) :: urb_hcon_wl                    !IN heat conductivity of wall material
+REAL ,DIMENSION(nvec) :: urb_alb_rd_so                  !IN road material solar albedo
+REAL ,DIMENSION(nvec) :: urb_alb_rf_so                  !IN roof material solar albedo
+REAL ,DIMENSION(nvec) :: urb_alb_wl_so                  !IN wall material solar albedo
+REAL ,DIMENSION(nvec) :: urb_alb_rd_th                  !IN road material thermal albedo
+REAL ,DIMENSION(nvec) :: urb_alb_rf_th                  !IN roof material thermal albedo
+REAL ,DIMENSION(nvec) :: urb_alb_wl_th                  !IN wall material thermal albedo
+REAL ,DIMENSION(nvec) :: ahf_traffic                    !IN Anthropogenic heat flux by traffic (annual mean)
+REAL ,DIMENSION(nvec) :: ahf_industry                   !IN Anthropogenic heat flux by industry (annual mean)
+INTEGER               :: teb_utc_hour                   !IN Time zone for traffic daily cycle calculation                  
+	
+! Input parameters for BEM 
+CHARACTER(LEN=3)  :: teb_itype_bem                      !IN Building Energy model 'DEF' or 'BEM'       
+LOGICAL           :: teb_lbem_ac                        !IN Flag to use air conditioners
+CHARACTER(LEN=4)  :: teb_itype_natvent                  !IN Natural ventilation 'NONE', 'AUTO', 'MECH', 'MANU'
+CHARACTER(LEN=6)  :: teb_itype_bem_cool                 !IN option for cooling device type 'DXCOIL','IDEAL '
+CHARACTER(LEN=6)  :: teb_itype_bem_heat                 !IN option for heating device type 'FINCAP','IDEAL '
+REAL ,DIMENSION(nvec) :: teb_frac_gz                    !IN Glazing ratio   
+REAL ,DIMENSION(nvec) :: teb_tcool_target               !IN Cooling setpoint of HVAC system [K]        
+REAL ,DIMENSION(nvec) :: teb_theat_target               !IN Heating setpoint of HVAC system [K]
+REAL ,DIMENSION(nvec) :: teb_bem_vent                   !IN Ventilation flow rate [AC/H]
+REAL ,DIMENSION(nvec) :: teb_bem_inf                    !IN Infiltration flow rate [AC/H]
+REAL ,DIMENSION(nvec) :: teb_bem_cop                    !IN Rated COP of the cooling system
+REAL, DIMENSION(nvec) :: teb_zresidential               !IN Fraction of residential use in buildings(-)
+REAL, DIMENSION(nvec) :: teb_dt_res                     !IN target temperature change when unoccupied (K) (residential buildings)                
+REAL, DIMENSION(nvec) :: teb_dt_off                     !IN target temperature change when unoccupied (K) (office buildings)                     
+REAL, DIMENSION(nvec) :: teb_cap_sys_heat               !IN Capacity of the heating system [W m-2(bld)]
+
+! Input parameters for Wind calculation
+INTEGER  :: teb_itype_wind                              !IN TEB option for camyon wond calculation:
+													    ! 0 - default; 1 - Wang scheme
+REAL ,DIMENSION(nvec, 1:8) :: teb_fai                   !IN Frontal area index                 
+
+! Input parameters for Greenroof from TERRA
+LOGICAL  :: teb_lgreenroof                              !IN Flag to use a green roofs scheme
+LOGICAL  :: teb_lgreenroof_ext                          !IN Flag to use external green roofs scheme
+REAL ,DIMENSION(nvec) :: teb_frac_gr                    !IN fraction of greenroofs on roofs             
+REAL ,DIMENSION(nvec) :: teb_alb_gr                     !IN green roof albedo
+REAL ,DIMENSION(nvec) :: teb_emis_gr                    !IN green roof emissivity 
+REAL ,DIMENSION(nvec) :: teb_ts_gr                      !IN greenroof radiative surface temp. (snow free)
+REAL ,DIMENSION(nvec) :: teb_shfl_gr                    !IN sensible heat flux over greenroofs 
+REAL ,DIMENSION(nvec) :: teb_lhfl_gr                    !IN latent heat flux over greenroofs 
+REAL ,DIMENSION(nvec) :: teb_qvfl_gr                    !IN total evaporation over greenroofs (kg/m2/s)
+REAL ,DIMENSION(nvec) :: teb_runoff_gr                  !IN greenroof surface runoff
+
+! Input parameters for Garden from TERRA           
+LOGICAL  :: teb_lgarden                                 !IN Flag to use a garden scheme
+LOGICAL  :: teb_lgarden_ext                             !IN Flag to use external garden scheme
+REAL ,DIMENSION(nvec) :: teb_z0_gd                      !IN garden roughness length
+REAL ,DIMENSION(nvec) :: teb_alb_gd                     !IN garden albedo
+REAL ,DIMENSION(nvec) :: teb_emis_gd                    !IN garden emissivity 
+REAL ,DIMENSION(nvec) :: teb_ts_gd                      !IN garden radiative surface temp. (snow free)
+REAL ,DIMENSION(nvec) :: teb_qs_gd                      !IN garden specific humidity
+REAL ,DIMENSION(nvec) :: teb_shfl_gd                    !IN sensible heat flux over garden 
+REAL ,DIMENSION(nvec) :: teb_lhfl_gd                    !IN latent heat flux over garden 
+REAL ,DIMENSION(nvec) :: teb_qvfl_gd                    !IN total evaporation over garden (kg/m2/s)
+REAL ,DIMENSION(nvec) :: teb_runoff_gd                  !IN garden surface runoff
+
+! Input parameters for Solar Panels module           
+LOGICAL  :: teb_lsolar_panel                            !IN Flag to use a solar panels on roofs
+REAL ,DIMENSION(nvec) :: teb_fr_panel                   !IN fraction of solar panels on roofs
+
+! Input parameters for Irrigation
+LOGICAL               :: teb_lroad_irrig                !IN Flag for road watering
+REAL, DIMENSION(nvec) :: teb_rd_irrig_start_m           !IN start month for watering of roads(included)
+REAL, DIMENSION(nvec) :: teb_rd_irrig_end_m             !IN end   month for watering of roads(included)
+REAL, DIMENSION(nvec) :: teb_rd_irrig_start_h           !IN start hour  for watering of roads(included)
+REAL, DIMENSION(nvec) :: teb_rd_irrig_end_h             !IN end   hour  for watering of roads(excluded)
+REAL, DIMENSION(nvec) :: teb_rd_irrig_sum               !IN 24h quantity of water used for road watering (liter/m2)               
+
+! Input/Output semi-prognostic variables 
+REAL ,DIMENSION(nvec) :: teb_tcanyon                    !INOUT air canyon temperature 
+REAL ,DIMENSION(nvec) :: teb_qcanyon                    !INOUT canyon air humidity ratio
+
+! Input/Output prognostic variables
+REAL ,DIMENSION(nvec) :: teb_ti_bld                     !INOUT indoor air temperature   
+REAL ,DIMENSION(nvec) :: teb_qi_bld                     !INOUT Indoor air specific humidity [kg kg-1]     
+REAL ,DIMENSION(nvec, teb_nroof_layer)  :: teb_troof    !INOUT roof layers temperatures
+REAL ,DIMENSION(nvec, teb_nroad_layer)  :: teb_troad_now!INOUT road layers temperatures at previous time-step       
+REAL ,DIMENSION(nvec, teb_nroad_layer)  :: teb_troad    !INOUT road layers temperatures     
+REAL ,DIMENSION(nvec, teb_nwall_layer)  :: teb_twalla   !INOUT wall layers temperatures (wall 'A') 
+REAL ,DIMENSION(nvec, teb_nwall_layer)  :: teb_twallb   !INOUT wall layers temperatures (wall 'B') 
+REAL ,DIMENSION(nvec, teb_nfloor_layer) :: teb_tfloor   !INOUT Floor layers temperatures [K] 
+REAL ,DIMENSION(nvec, teb_nfloor_layer) :: teb_tmass    !INOUT Internal mass layers temperatures [K]  
+REAL ,DIMENSION(nvec) :: teb_ws_roof                    !INOUT roof water content (kg/m2)    
+REAL ,DIMENSION(nvec) :: teb_ws_road                    !INOUT road water content (kg/m2)    
+REAL ,DIMENSION(nvec, 1) :: teb_wsnow_roof              !INOUT Initial Amount      of roof snow reservoir 
+REAL ,DIMENSION(nvec, 1) :: teb_wsnow_road              !INOUT Initial amount      of road snow reservoir
+REAL ,DIMENSION(nvec, 1) :: teb_tsnow_roof              !INOUT layer temperature   of roof snow
+REAL ,DIMENSION(nvec, 1) :: teb_tsnow_road              !INOUT layer temperature   of road snow  
+REAL ,DIMENSION(nvec, 1) :: teb_rsnow_roof              !INOUT density             of roof snow
+REAL ,DIMENSION(nvec, 1) :: teb_rsnow_road              !INOUT density             of road snow
+REAL ,DIMENSION(nvec) :: teb_tssnow_roof                !INOUT surface temperature of roof snow
+REAL ,DIMENSION(nvec) :: teb_tssnow_road                !INOUT surface temperature of road snow
+REAL ,DIMENSION(nvec) :: teb_asnow_roof                 !INOUT roof snow albedo 
+REAL ,DIMENSION(nvec) :: teb_asnow_road                 !INOUT road snow albedo 
+REAL ,DIMENSION(nvec) :: teb_esnow_roof                 !INOUT snow roof emissivity
+REAL ,DIMENSION(nvec) :: teb_esnow_road                 !INOUT snow road emissivity
+REAL ,DIMENSION(nvec) :: teb_twin1                      !INOUT outdoor window temperature [K] 
+REAL ,DIMENSION(nvec) :: teb_twin2                      !INOUT Indoor window temperature [K] 
+REAL ,DIMENSION(nvec) :: teb_albwin                     !INOUT window albedo
+REAL ,DIMENSION(nvec) :: teb_cap_sys_rat                !INOUT Rated capacity of the cooling system [W m-2(floor)]                      
+REAL ,DIMENSION(nvec) :: teb_m_sys_rat                  !INOUT Rated HVAC mass flow rate [kg s-1 m-2(bld)]
+LOGICAL ,DIMENSION(nvec) :: teb_shad_day                !INOUT has shading been necessary this day ? 
+LOGICAL ,DIMENSION(nvec) :: teb_natvent_night           !INOUT has natural ventilation been
+
+! Output diagnostic variables
+! For town
+REAL ,DIMENSION(nvec) :: teb_shfl  		                !OUT sensible heat flux over town
+REAL ,DIMENSION(nvec) :: teb_lhfl   	                !OUT latent heat flux over town   
+REAL ,DIMENSION(nvec) :: teb_qvfl   	                !OUT evaporation (kg/m2/s)    
+REAL ,DIMENSION(nvec) :: teb_gflux                      !OUT Flux through the ground for town  
+REAL ,DIMENSION(nvec) :: teb_dqs_town                   !OUT Storage inside town materials  
+REAL ,DIMENSION(nvec) :: teb_tch_town                   !OUT Heat exchange coefficient  
+REAL ,DIMENSION(nvec) :: teb_tstown_s_now               !OUT town surface temperature from flux calculation at previous time-step 
+REAL ,DIMENSION(nvec) :: teb_tstown_s                   !OUT town surface temperature from flux calculation
+REAL ,DIMENSION(nvec) :: teb_qstown_s                   !OUT town surface specific humidity from flux calculation (kg/kg)
+REAL ,DIMENSION(nvec) :: teb_wstown_now                 !OUT town water content (m H2O) at previous time-step    
+REAL ,DIMENSION(nvec) :: teb_wstown                     !OUT town water content (m H2O)
+REAL ,DIMENSION(nvec) :: teb_runoff_town                !OUT runoff for town
+REAL ,DIMENSION(nvec) :: teb_alb_so                     !OUT town solar albedo  
+REAL ,DIMENSION(nvec) :: teb_alb_th                     !OUT town thermal albedo
+REAL ,DIMENSION(nvec) :: teb_wind_top                   !OUT Wind speed at canyon top (m/s)
+REAL ,DIMENSION(nvec) :: teb_ucanyon                    !OUT u-wind component of wind inside the canyon    
+REAL ,DIMENSION(nvec) :: teb_vcanyon                    !OUT v-wind component of wind inside the canyon   
+REAL ,DIMENSION(nvec) :: teb_wind_canyon                !OUT Wind speed in canyon   
+REAL ,DIMENSION(nvec) :: teb_rn_town                    !OUT Net radiation over town    
+
+! For individual surfaces
+REAL ,DIMENSION(nvec) :: teb_tsroof                     !OUT roof surface temperature   [K] 
+REAL ,DIMENSION(nvec) :: teb_tsroad                     !OUT road surface temperature   [K] 
+REAL ,DIMENSION(nvec) :: teb_tswalla                    !OUT wall 'A' surface temperature [K] 
+REAL ,DIMENSION(nvec) :: teb_tswallb                    !OUT wall 'B' surface temperature [K]  
+REAL ,DIMENSION(nvec) :: teb_shfl_rf                    !OUT Sensible heat flux over roof
+REAL ,DIMENSION(nvec) :: teb_shfl_rd                    !OUT Sensible heat flux over road
+REAL ,DIMENSION(nvec) :: teb_shfl_wl                    !OUT Sensible heat flux over wall
+REAL ,DIMENSION(nvec) :: teb_tch_rd                     !OUT road transfer coefficient for heat
+REAL ,DIMENSION(nvec) :: teb_tch_rf                     !OUT roof transfer coefficient for heat
+REAL ,DIMENSION(nvec) :: teb_tch_wl                     !OUT wall transfer coefficient for heat
+REAL ,DIMENSION(nvec) :: teb_tch_top                    !OUT between canyon top and atm. transfer coefficient for hea
+REAL ,DIMENSION(nvec) :: teb_ac_rf                      !OUT Roof aerodynamical conductance
+REAL ,DIMENSION(nvec) :: teb_ac_rd                      !OUT Road aerodynamical conductance
+REAL ,DIMENSION(nvec) :: teb_ac_wl                      !OUT Wall aerodynamical conductance
+REAL ,DIMENSION(nvec) :: teb_ac_top                     !OUT Canyon-atm. aerodynamical conductance
+
+! Snow variables
+REAL ,DIMENSION(nvec) :: teb_tssnow_town_now            !OUT town snow surface temperature (K) at previous time-step
+REAL ,DIMENSION(nvec) :: teb_tssnow_town                !OUT town snow surface temperature (K)
+REAL ,DIMENSION(nvec) :: teb_wsnow_town_now             !OUT town snow (& liq. water) content (m H2O) at previous time-step
+REAL ,DIMENSION(nvec) :: teb_wsnow_town                 !OUT town snow (& liq. water) content (m H2O)
+REAL ,DIMENSION(nvec) :: teb_rsnow_town_now             !OUT town snow layers density (kg/m3) at previous time-step
+REAL ,DIMENSION(nvec) :: teb_rsnow_town                 !OUT town snow layers density (kg/m3)
+REAL ,DIMENSION(nvec) :: teb_shfl_snow                  !OUT sensible heat flux over snow
+REAL ,DIMENSION(nvec) :: teb_lhfl_snow                  !OUT latent heat flux over snow	
+REAL ,DIMENSION(nvec) :: teb_frsnow                     !OUT snow fraction over town
+REAL ,DIMENSION(nvec) :: teb_snow_melt                  !OUT Snow melt for built & impervious part (kg/m2)
+REAL ,DIMENSION(nvec) :: teb_hsnow_town_now             !OUT town snow depth at previous time-step
+REAL ,DIMENSION(nvec) :: teb_hsnow_town                 !OUT town snow depth
+
+! BEM variables
+REAL ,DIMENSION(nvec) :: teb_hwaste                     !OUT Sensible waste heat from HVAC system [W m-2(tot)] 
+REAL ,DIMENSION(nvec) :: teb_hvac_cool                  !OUT Energy consumption of the cooling system [W m-2(bld)]  
+REAL ,DIMENSION(nvec) :: teb_hvac_heat                  !OUT Energy consumption of the heating system [W m-2(bld)]  
+
+!Variables for garden (COSMO)
+REAL ,DIMENSION(nvec) :: teb_sobs                       !OUT Shortwave radiation absorbed by garden
+REAL ,DIMENSION(nvec) :: teb_thbs                       !OUT Longwave radiation absorbed by garden
+REAL ,DIMENSION(nvec) :: teb_tch_gd                     !OUT garden transfer coefficient for heat
+REAL ,DIMENSION(nvec) :: teb_tcm_gd                     !OUT garden  surf. exchange coefficient
+
+!Other variables
+REAL ,DIMENSION(nvec) :: teb_ilmo_road
+REAL ,DIMENSION(nvec) :: teb_ilmo_roof
+REAL ,DIMENSION(nvec) :: teb_ilmo_top
+REAL ,DIMENSION(nvec) :: ahf_traffic_now                !OUT Anthropogenic heat flux by traffic (current value)
+REAL ,DIMENSION(nvec) :: teb_solar_prod                 !OUT Averaged Energy production of solar panel on roofs (W/m2 bld  )
+	
+
+! Atmospheric Forcing variables                                                       
+REAL, DIMENSION(:,:), ALLOCATABLE :: ZTA    ! air temperature forcing (K)             
+REAL, DIMENSION(:,:), ALLOCATABLE :: ZQA    ! air humidity forcing (kg/m3)            
+REAL, DIMENSION(:,:), ALLOCATABLE :: ZWIND  ! wind speed (m/s)                        
+REAL, DIMENSION(:,:), ALLOCATABLE :: ZSCA_SW! diffuse solar radiation (on hor surf)   
+REAL, DIMENSION(:,:), ALLOCATABLE :: ZDIR_SW! direct  solar radiation (on hor surf)   
+REAL, DIMENSION(:,:), ALLOCATABLE :: ZLW    ! longwave radiation (on horizontal surf) 
+REAL, DIMENSION(:,:), ALLOCATABLE :: ZSNOW  ! snow precipitation  (kg/m2/s)           
+REAL, DIMENSION(:,:), ALLOCATABLE :: ZRAIN  ! liquid precipitation  (kg/m2/s)         
+REAL, DIMENSION(:,:), ALLOCATABLE :: ZPS    ! pressure at forcing level  (Pa)         
+!REAL, DIMENSION(:,:), ALLOCATABLE :: ZCO2   ! CO2 concentration in the air  (kg/m3)   
+REAL, DIMENSION(:,:), ALLOCATABLE :: ZDIR   ! wind direction                          
+
+! -----------------------------------------------------------                        
+! Outputs                                                                            
+! -----------------------------------------------------------                        
+!                                                                                    
+CHARACTER(LEN=*), PARAMETER       :: T_ROOF1 = 'output/T_ROOF1.txt'                  
+CHARACTER(LEN=*), PARAMETER       :: T_CANYON = 'output/T_CANYON.txt'                
+CHARACTER(LEN=*), PARAMETER       :: T_ROAD1 = 'output/T_ROAD1.txt'                  
+CHARACTER(LEN=*), PARAMETER       :: T_WALLA1= 'output/T_WALLA1.txt'                 
+CHARACTER(LEN=*), PARAMETER       :: T_WALLB1= 'output/T_WALLB1.txt'                 
+CHARACTER(LEN=*), PARAMETER       :: TI_BLD = 'output/TI_BLD.txt'                    
+CHARACTER(LEN=*), PARAMETER       :: Q_CANYON = 'output/Q_CANYON.txt'                
+CHARACTER(LEN=*), PARAMETER       :: P_CANYON = 'output/P_CANYON.txt'                
+CHARACTER(LEN=*), PARAMETER       :: U_CANYON = 'output/U_CANYON.txt'                
+CHARACTER(LEN=*), PARAMETER       :: H_TOWN = 'output/H_TOWN.txt'                    
+CHARACTER(LEN=*), PARAMETER       :: LE_TOWN = 'output/LE_TOWN.txt'                  
+CHARACTER(LEN=*), PARAMETER       :: RN_TOWN = 'output/RN_TOWN.txt'                  
+CHARACTER(LEN=*), PARAMETER       :: HVAC_COOL = 'output/HVAC_COOL.txt'              
+CHARACTER(LEN=*), PARAMETER       :: HVAC_HEAT = 'output/HVAC_HEAT.txt'
+CHARACTER(LEN=*), PARAMETER       :: SOLAR_PROD = 'output/SOLAR_PROD.txt'
+! -----------------------------------------------------------                        
+! Namelist paths                                                                            
+! -----------------------------------------------------------                                      
+INTEGER                           :: fu, rc
+CHARACTER(LEN=*), PARAMETER       :: namelist_path = 'namelist/namelist.nml'
+CHARACTER(LEN=*), PARAMETER       :: namelist_forcing_path = 'namelist/namelist_forcing.nml'
+CHARACTER(LEN=100)                :: forcing_path   ! Forcing filepath that we read from namelist
+CHARACTER(:), allocatable         :: forcing_path2  ! Forcing filepath with adjusted length
+
+!============================================================
+!============================================================
+!             PARAMETERS SETUP            
+!============================================================
+!============================================================
+!============================================================
+!============================================================
+! Basic Settings of Location and Forcing
+!============================================================
+!============================================================
+lon_teb(:)        = 1.3              ! Longitude (deg)
+lat_teb(:)        = 43.484           ! Latitude (deg)
+hlev_teb(:)       = 28.0             ! Atm. Forcing height above roof level
+teb_year          = 2004             ! Current year (UTC)
+teb_month         = 2                ! Current month (UTC)
+teb_day           = 20               ! Current day (UTC)
+teb_hour          = 0                ! Current hour (UTC)
+teb_min           = 0                ! Current minute (UTC)
+teb_sec           = 0                ! Current seconds (UTC)
+dt                = 300.             ! Forcing time-steps
+nsteps            = 17999            ! Number of Forcing time-steps
+INB_ATM           = 6                ! number time the driver calls the TEB
+!                                    ! routines during a forcing time-step
+!                                    ! --> it defines the time-step for TEB
+!============================================================
+! Settings for Coupled Model (do not change in offline mode) 
+!============================================================
+sa_uc(:)          = 1.               ! Urban fraction
+ivstart           = 1                ! optional start index                  
+ivend             = 1                ! optional end index                  
+iblock            = 1                ! number of block  
+
+! Input forcing
+u(:) = 5.
+v(:) = -1.
+t(:) = 290.3
+qv(:) = 0.00380
+ps(:) = 98872.90000
+rho(:) = 1.26
+prr_con(:) = 0.
+prs_con(:) = 0.
+prr_gsp(:) = 0.
+prs_gsp(:) = 0.
+prg_gsp(:) = 0.
+lwd_s(:)   = 286.14000
+swdir_s(:) = 0.
+swdifd_s(:) = 0.
+
+!============================================================
+!============================================================
+! Urban geometry
+!============================================================
+!============================================================
+urb_fr_bld(:)    = 0.62             ! Horizontal building area density
+fr_garden(:)     = 0.2              ! Fraction of GARDEN areas
+urb_h2w(:)       = 1.38158          ! Canyon H/W
+urb_h_bld(:)     = 20.              ! Canyon height (m)
+teb_road_dir(:)  = 0.0              ! Road direction (° from North, clockwise)
+teb_hroad_dir    = 'UNIF'           ! Road direction
+                                    ! 'UNIF' : uniform roads
+                                    ! 'ORIE' : specified road orientation
+teb_wall_opt     = 'UNIF'           ! Wall option
+                                    ! 'UNIF' : uniform walls
+                                    ! 'TWO ' : 2 opposite  wall
+!============================================================
+!============================================================
+! Roof
+!============================================================
+!============================================================
+urb_hcap_rf(:)   = 1580000.         ! Volumetric heat capacity (J m-3 K-1)
+urb_hcon_rf(:)   = 1.15             ! Thermal conductivity (W/m K)
+urb_alb_rf_so(:) = 0.40             ! Solar albedo of roofs
+urb_alb_rf_th(:) = 0.03             ! Thermal albedo of roofs
+!============================================================
+!============================================================
+! Road
+!============================================================
+!============================================================
+urb_hcap_rd(:)   = 1740000.         ! Volumetric heat capacity (J m-3 K-1)
+urb_hcon_rd(:)   = 0.82             ! Thermal conductivity (W/m K)
+urb_alb_rd_so(:) = 0.08             ! Solar albedo of roads
+urb_alb_rd_th(:) = 0.04             ! Thermal albedo of roads
+!============================================================
+!============================================================
+! Wall
+!============================================================
+!============================================================
+urb_hcap_wl(:)   = 1580000.         ! Volumetric heat capacity (J m-3 K-1)
+urb_hcon_wl(:)   = 1.15             ! Thermal conductivity (W/m K)
+urb_alb_wl_so(:) = 0.32             ! Solar albedo of walls
+urb_alb_wl_th(:) = 0.03             ! Thermal albedo of walls
+!============================================================
+!============================================================
+!* anthropogenic heat fluxes
+!============================================================
+!============================================================
+ahf_traffic(:)   = 0.0              ! heat fluxes due to traffic
+teb_utc_hour     = 3                ! Time zone for traffic daily cycle calculation                          
+ahf_industry(:)  = 0.0              ! heat fluxes due to factories
+!============================================================
+!============================================================
+! Parameters for Building Energy Module (BEM)
+!============================================================
+!============================================================ 
+teb_itype_bem        = 'BEM'        ! Building energy Model
+                                    ! 'DEF'  : no Building Energy Model
+                                    ! 'BEM'  :    Building Energy Model
+teb_lbem_ac          = .TRUE.       ! Flag to use air conditioners
+teb_itype_natvent    = 'NONE'       ! Natural Ventilation ! 'NONE', 'MANU', 'AUTO', 'MECH'
+teb_itype_bem_cool   = 'IDEAL '     ! Cooling system    ! 'DXCOIL','IDEAL '    
+teb_itype_bem_heat   = 'IDEAL '     ! Heating system    ! 'FINCAP','IDEAL '
+teb_frac_gz    (:)   = 0.1          ! Glazing ratio 
+teb_tcool_target(:)  = 297.16       ! Cooling setpoint of HVAC system [K]
+teb_theat_target(:)  = 292.16       ! Heating setpoint of HVAC system [K]
+teb_bem_vent   (:)   = 0.0          ! Ventilation flow rate [AC/H]
+teb_bem_inf    (:)   = 0.5          ! Infiltration flow rate [AC/H]
+teb_bem_cop    (:)   = 2.5	        ! Rated COP of the cooling system
+teb_zresidential(:)  = 1.           ! Fraction of residential use in buildings (-)
+teb_dt_res(:)        = 3.           ! Target temperature change when unoccupied (K) (residential buildings)
+teb_dt_off(:)        = 3.           ! Target temperature change when unoccupied (K) (office buildings)
+teb_cap_sys_heat(:)  =  90.         ! Capacity of the heating system [W m-2(bld)]
+
+!============================================================
+!============================================================
+! Wind calculation	
+!============================================================
+!============================================================
+teb_itype_wind       = 0            !IN TEB option for camyon wond calculation:
+									! 0 - default; 1 - Wang scheme 
+teb_fai(:,1:8)       = 0.5          ! Frontal area index
+!============================================================
+!============================================================
+! Parameters for GREENROOF module 
+!============================================================
+!============================================================
+teb_lgreenroof       = .FALSE.      ! Greenroof activation
+teb_lgreenroof_ext   = .FALSE.      ! Greenroof activation (external scheme)
+teb_frac_gr     (:)  = 0.0          ! Fraction of greenroofs on roofs  
+teb_alb_gr      (:)  = 0.15         ! Greenroof albedo
+teb_emis_gr     (:)  = 0.9          ! Greenroof emissivity 
+teb_ts_gr       (:)  = 275.         ! Greenroof radiative surface temp. (snow free)
+teb_shfl_gr     (:)  = 0.           ! Sensible heat flux over greenroofs 
+teb_lhfl_gr     (:)  = 0.           ! Latent heat flux over greenroofs 
+teb_qvfl_gr     (:)  = 0.           ! Total evaporation over greenroofs (kg/m2/s)
+teb_runoff_gr   (:)  = 0.	        ! Greenroof surface runoff
+!============================================================
+!============================================================
+! Parameters for GARDEN module 
+!============================================================
+!============================================================	
+teb_lgarden          = .TRUE.       ! Garden activation
+teb_lgarden_ext      = .FALSE.      ! Garden activation (external scheme)
+teb_z0_gd       (:)  = 0.8          ! Garden roughness length
+teb_alb_gd      (:)  = 0.15         ! Garden albedo
+teb_emis_gd     (:)  = 0.9          ! Garden emissivity 
+teb_ts_gd       (:)  = 275.         ! Garden radiative surface temp. (snow free)
+teb_qs_gd       (:)  = 0.00380      ! Garden specific humidity
+teb_shfl_gd     (:)  = 0.           ! Sensible heat flux over garden 
+teb_lhfl_gd     (:)  = 0.           ! Latent heat flux over garden 
+teb_qvfl_gd     (:)  = 0.           ! Total evaporation over garden (kg/m2/s)
+teb_runoff_gd   (:)  = 0.           ! Garden surface runoff
+
+!============================================================
+!============================================================
+! Parameters for Solar Panels module 
+!============================================================
+!============================================================	
+teb_lsolar_panel     = .FALSE.       ! Garden activation
+teb_fr_panel(:)      = 0.            ! Garden roughness length
+!============================================================
+!============================================================
+! Parameters for Road Watering
+!============================================================
+!============================================================
+teb_lroad_irrig         = .FALSE.    ! Road watering activation
+teb_rd_irrig_start_m(:) = 6.         ! start month for watering of roads (included)
+teb_rd_irrig_end_m(:)   = 8.         ! end   month for watering of roads (included)
+teb_rd_irrig_start_h(:) = 6.         ! start hour  for watering of roads (included)
+teb_rd_irrig_end_h(:)   = 9.         ! end   hour  for watering of roads (excluded)
+teb_rd_irrig_sum(:)     = 1.         ! 24h quantity of water used for road watering (liter/m2)
+
+!===========================================================================
+!===========================================================================
+! READ NAMELIST FORCING PARAMETERS
+!===========================================================================
+!===========================================================================
+NAMELIST /tebforcing/ forcing_path, lon_teb, lat_teb, hlev_teb, teb_year,   &
+                      teb_month, teb_day, teb_hour, teb_min, nsteps, dt
+! Read from file.
+open (action='read', file=namelist_forcing_path, iostat=rc, newunit=fu)
+read (nml=tebforcing, iostat=rc, unit=fu)
+forcing_path2=trim(forcing_path)
+
+!===========================================================================
+!===========================================================================
+! READ NAMELIST PARAMETERS
+!===========================================================================
+!===========================================================================
+NAMELIST /tebparam/ urb_h_bld, urb_fr_bld, fr_garden, urb_h2w, teb_road_dir,           &
+                    teb_hroad_dir, teb_wall_opt, teb_ti_bld, teb_qi_bld,               &
+					urb_alb_rf_so, urb_alb_rf_th, urb_hcap_rf, urb_hcon_rf,            &
+					urb_alb_rd_so, urb_alb_rd_th, urb_hcap_rd, urb_hcon_rd,            &
+					urb_alb_wl_so, urb_alb_wl_th, urb_hcap_wl, urb_hcon_wl,            &
+					teb_itype_bem, teb_lbem_ac, teb_itype_natvent, teb_itype_bem_cool, &
+					teb_itype_bem_heat, teb_frac_gz, teb_tcool_target,                 &
+					teb_theat_target, teb_zresidential, teb_dt_res, teb_dt_off,        &
+                    teb_bem_inf, teb_bem_vent, teb_bem_cop, teb_cap_sys_rat,           &
+                    teb_m_sys_rat, teb_cap_sys_heat, ahf_traffic, ahf_industry,        &
+                    teb_itype_wind, teb_fai, teb_lgarden, teb_lgreenroof, teb_frac_gr, &
+                    teb_lsolar_panel, teb_fr_panel, teb_lroad_irrig,                   &
+                    teb_rd_irrig_start_m, teb_rd_irrig_end_m, teb_rd_irrig_start_h,    &
+                    teb_rd_irrig_end_h, teb_rd_irrig_sum, teb_utc_hour					
+! Read from file.
+open (action='read', file=namelist_path, iostat=rc, newunit=fu)
+read (nml=tebparam, iostat=rc, unit=fu)
+
+!===========================================================================
+!===========================================================================
+! READ ATMOSPHERIC FORCING FROM FILES
+!===========================================================================
+!===========================================================================
+!* Open atmospheric forcing files
+!
+CALL OPEN_CLOSE_BIN_ASC_FORC('OPEN ','ASCII ',1,'R', forcing_path2)
+!
+! allocation of variables
+!
+CALL OL_ALLOC_ATM(1,1,1) ! INI, IBANDS, ISCAL
+! allocate local atmospheric variables
+ALLOCATE(ZTA    (2,1)) 
+ALLOCATE(ZQA    (2,1))
+ALLOCATE(ZWIND  (2,1))
+ALLOCATE(ZDIR_SW(2,1))
+ALLOCATE(ZSCA_SW(2,1))
+ALLOCATE(ZLW    (2,1))
+ALLOCATE(ZSNOW  (2,1))
+ALLOCATE(ZRAIN  (2,1))
+ALLOCATE(ZPS    (2,1))
+!ALLOCATE(ZCO2   (2,1))
+ALLOCATE(ZDIR   (2,1))
+!* reads atmospheric forcing for first time-step
+!
+CALL OL_READ_ATM('ASCII ', 'ASCII ', 1, forcing_path2,   &
+                    ZTA,ZQA,ZWIND,ZDIR_SW,ZSCA_SW,ZLW,ZSNOW,ZRAIN,ZPS,&
+                    ZDIR )
+
+! initialization of physical constants
+CALL INI_CSTS
+
+!XCO2(:)  = ZCO2(1,:)
+XCO2(:)  = 0.
+XRHOA(:) = ZPS(1,:) / ( ZTA(1,:)*XRD * ( 1.+((XRV/XRD)-1.)*ZQA(1,:) ) + hlev_teb(:)*XG )
+teb_hour_seconds = teb_hour * 3600. + teb_min * 60. + teb_sec
+
+! -----------------------------------------------------------
+! Outputs
+! -----------------------------------------------------------
+!
+OPEN(UNIT=13, FILE = T_ROOF1,   ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=14, FILE = T_CANYON,  ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=15, FILE = T_ROAD1,   ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=16, FILE = T_WALLA1,  ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=17, FILE = T_WALLB1,  ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=18, FILE = TI_BLD,    ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=19, FILE = Q_CANYON,  ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=20, FILE = P_CANYON,  ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=21, FILE = U_CANYON,  ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=22, FILE = H_TOWN,    ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=23, FILE = LE_TOWN,   ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=24, FILE = RN_TOWN,   ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=25, FILE = HVAC_COOL, ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=26, FILE = HVAC_HEAT, ACCESS = 'APPEND',STATUS = 'REPLACE')
+OPEN(UNIT=27, FILE = SOLAR_PROD,ACCESS = 'APPEND',STATUS = 'REPLACE')
+
+! -----------------------------------------------------------
+! Temporal loops
+! -----------------------------------------------------------
+!
+DO ntstep = 1, nsteps
+    WRITE(*,FMT='(I5,A1,I5)') ntstep,'/',nsteps
+	! read Forcing
+    CALL OL_READ_ATM('ASCII ', 'ASCII ', ntstep, forcing_path2,   &
+                    ZTA,ZQA,ZWIND,ZDIR_SW,ZSCA_SW,ZLW,ZSNOW,ZRAIN,ZPS,&
+                    ZDIR )
+    
+	DO JSURF_STEP=1,INB_ATM  
+	
+       ! time interpolation of the forcing
+       CALL OL_TIME_INTERP_ATM(JSURF_STEP,INB_ATM,                               &
+                               ZTA,ZQA,ZWIND,ZDIR_SW,ZSCA_SW,ZLW,ZSNOW,ZRAIN,ZPS,&
+                               ZDIR  )
+  
+       ! define forcing variables
+	   t(:) = XTA(:)
+	   ! specific humidity (conversion from kg/m3 to kg/kg)
+	   qv(:) = XQA(:) / XRHOA(:)
+	   u(:) = XU(:)
+	   v(:) = XV(:)
+	   ps(:) = XPS(:)
+	   rho(:) = XRHOA(:)
+	   prr_con(:) = XRAIN(:)
+	   prs_con(:) = XSNOW(:)
+	   prr_gsp(:) = 0.
+	   prs_gsp(:) = 0.
+	   prg_gsp(:) = 0.
+	   lwd_s(:) = XLW(:)
+	   swdir_s(:) = XDIR_SW(:,1)
+	   swdifd_s(:) = XSCA_SW(:,1)
+	   
+	   ! Update time
+	   teb_hour_seconds = teb_hour_seconds + dt
+	   teb_hour	   = teb_hour_seconds(1) / 3600.
+	   teb_min = mod(teb_hour_seconds(1), 3600.) / 60.
+	   teb_sec = mod(teb_hour_seconds(1), 60.)
+	   
+	   CALL ADD_FORECAST_TO_DATE_SURF(teb_year, teb_month, teb_day, teb_hour_seconds)
+
+!*****************************************************************************
+!                  Call of physical routines of TEB is here                  !
+!*****************************************************************************	   
+	   CALL teb_interface (ntstep, nvec, iblock, dt, teb_year, teb_month, teb_day, teb_hour,         &
+                teb_min, teb_sec, teb_hour_seconds, sa_uc, lon_teb, lat_teb, hlev_teb,              &
+				ivstart, ivend, u, v, t, qv, ps, rho, prr_con, prs_con, prr_gsp, prs_gsp, prg_gsp,  &
+				lwd_s, swdir_s, swdifd_s, teb_nroof_layer, teb_nroad_layer, teb_nwall_layer,        &
+				teb_nfloor_layer, urb_fr_bld, fr_garden, urb_h2w, urb_h_bld, urb_hcap_rd,           &
+				urb_hcap_rf, urb_hcap_wl, urb_hcon_rd, urb_hcon_rf, urb_hcon_wl, urb_alb_rd_so,     &
+				urb_alb_rf_so, urb_alb_wl_so, urb_alb_rd_th, urb_alb_rf_th, urb_alb_wl_th,          &
+				ahf_traffic, ahf_industry, teb_ti_bld, teb_troof, teb_troad_now, teb_troad,         &
+				teb_twalla, teb_twallb, teb_tfloor, teb_tmass, teb_qi_bld, teb_tcanyon,             &
+				teb_qcanyon, teb_ucanyon, teb_vcanyon, teb_sobs, teb_thbs, teb_ws_roof,             &
+				teb_ws_road, teb_wsnow_roof, teb_wsnow_road, teb_tsnow_roof, teb_tsnow_road,        &
+				teb_rsnow_roof, teb_rsnow_road, teb_tssnow_roof, teb_tssnow_road, teb_asnow_roof,   &
+				teb_asnow_road, teb_esnow_roof, teb_esnow_road, teb_twin1, teb_twin2, teb_albwin,   &
+				teb_tsroof, teb_tswalla, teb_tswallb, teb_shfl, teb_lhfl, teb_tstown_s_now,         &
+				teb_tstown_s, teb_qstown_s, teb_wstown_now, teb_wstown, teb_runoff_town,            &
+				teb_tssnow_town_now, teb_tssnow_town, teb_wsnow_town_now, teb_wsnow_town,           &
+				teb_rsnow_town_now, teb_rsnow_town, teb_tch_town, teb_qvfl, teb_shfl_snow,          &
+				teb_lhfl_snow, teb_frsnow, teb_snow_melt, teb_hsnow_town_now, teb_hsnow_town,       &
+				teb_alb_so, teb_alb_th, teb_itype_bem, teb_lbem_ac, teb_itype_natvent,              &
+				teb_itype_bem_cool, teb_itype_bem_heat, teb_frac_gz, teb_tcool_target,              &
+				teb_theat_target, teb_bem_vent, teb_bem_inf, teb_bem_cop, teb_cap_sys_rat,          &
+				teb_m_sys_rat, teb_shad_day, teb_natvent_night, teb_hwaste, teb_hvac_cool,          &
+				teb_hvac_heat, teb_lgreenroof,  teb_frac_gr, teb_alb_gr, teb_emis_gr, teb_ts_gr,    &
+				teb_shfl_gr, teb_lhfl_gr, teb_qvfl_gr, teb_runoff_gr, teb_lgarden, teb_z0_gd,       &
+				teb_alb_gd, teb_emis_gd, teb_ts_gd, teb_qs_gd, teb_shfl_gd, teb_lhfl_gd,            &
+				teb_qvfl_gd, teb_tch_gd, teb_tcm_gd, teb_runoff_gd, teb_itype_wind, teb_fai,        &
+				teb_dqs_town, teb_gflux, teb_shfl_rf, teb_shfl_rd, teb_shfl_wl, teb_ac_rf,          &
+				teb_ac_rd, teb_ac_wl, teb_ac_top, teb_tch_rf, teb_tch_rd, teb_tch_wl, teb_tch_top,  &
+				teb_wind_top, teb_ilmo_road, teb_ilmo_roof, teb_ilmo_top, ahf_traffic_now,          &
+				teb_rn_town, teb_wind_canyon, teb_tsroad, teb_lgarden_ext, teb_lgreenroof_ext,      &
+				teb_hroad_dir, teb_wall_opt, teb_road_dir, teb_zresidential, teb_dt_res, teb_dt_off,&
+				teb_cap_sys_heat, teb_lsolar_panel, teb_fr_panel, teb_lroad_irrig,                  &
+				teb_rd_irrig_start_m, teb_rd_irrig_end_m, teb_rd_irrig_start_h, teb_rd_irrig_end_h, &
+				teb_rd_irrig_sum, teb_solar_prod, teb_utc_hour)
+						
+    END DO
+	   !
+    WRITE(13,*) teb_tsroof
+    WRITE(14,*) teb_tcanyon
+    WRITE(15,*) teb_tsroad
+    WRITE(16,*) teb_tswalla
+    WRITE(17,*) teb_tswallb
+    WRITE(18,*) teb_ti_bld
+    WRITE(19,*) teb_qcanyon
+    WRITE(20,*) XPS
+    WRITE(21,*) teb_wind_canyon
+    WRITE(22,*) teb_shfl
+    WRITE(23,*) teb_lhfl
+    WRITE(24,*) teb_rn_town
+    IF (teb_itype_bem=='BEM') THEN
+      WRITE(25,*) teb_hvac_cool
+      WRITE(26,*) teb_hvac_heat
+    END IF
+	IF (teb_lsolar_panel) THEN
+      WRITE(27,*) teb_solar_prod
+    END IF
+END DO
+
+!  DEALLOCATE variables
+DEALLOCATE(ZTA) 
+DEALLOCATE(ZQA)
+DEALLOCATE(ZWIND)
+DEALLOCATE(ZDIR_SW)
+DEALLOCATE(ZSCA_SW)
+DEALLOCATE(ZLW)
+DEALLOCATE(ZSNOW)
+DEALLOCATE(ZRAIN)
+DEALLOCATE(ZPS)
+!DEALLOCATE(ZCO2)
+DEALLOCATE(ZDIR)
+
+CALL OPEN_CLOSE_BIN_ASC_FORC('CLOSE ','ASCII ',1,'R', forcing_path2)
+CLOSE(13)
+CLOSE(14)
+CLOSE(15)
+CLOSE(16)
+CLOSE(17)
+CLOSE(18)
+CLOSE(19)
+CLOSE(20)
+CLOSE(21)
+CLOSE(22)
+CLOSE(23)
+CLOSE(24)
+CLOSE(25)
+CLOSE(26)
+CLOSE(27)
+
+!
+    WRITE(*,*) ' '
+    WRITE(*,*) '    --------------------------'
+    WRITE(*,*) '    |  DRIVER ENDS CORRECTLY |'
+    WRITE(*,*) '    --------------------------'
+    WRITE(*,*) ' '
+!
+! --------------------------------------------------------------------------------------
+!
+END PROGRAM run_teb_offline
