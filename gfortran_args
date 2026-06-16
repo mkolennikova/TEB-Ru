@@ -1,13 +1,24 @@
 ######################################################################
+# C compiler
 CC = gcc
-#FC = gfortran
-FC = ifort
-LD = ifort
+
+# Auto-detect Fortran compiler: ifort if available, otherwise gfortran
+FC := $(shell if command -v ifort >/dev/null 2>&1; then echo ifort; else echo gfortran; fi)
+# Use the same compiler for linking
+LD := $(FC)
+
+# Compiler flags depending on the chosen compiler
+ifeq ($(FC),ifort)
+    # Intel ifort flags
+    FFLAGS = -us -g -O0 -W1 -c -r8 -fpe0 -traceback
+else
+    # GNU gfortran flags
+    FFLAGS = -funderscoring -O0 -g -Wall -c -fmessage-length=0 -fdefault-real-8 -ffpe-trap=invalid,zero
+endif
+
+# Preprocessor flags (if any)
 CPPFLAGS = #-P -traditional -Wcomment
-FFLAGS = #-funderscoring -O0 -g -Wall -c -fmessage-length=0 -fdefault-real-8 -ffpe-trap=invalid,zero
-FFLAGS = -us -g -O0 -W1 -c -r8 -fpe0 -traceback
-#FFLAGS = -g -O2
-# add your libraries after LIBS= , e.g. -lblas
+
+# Libraries and linker flags
 LIBS =
 LDFLAGS = $(LIBS)
-######################################################################
