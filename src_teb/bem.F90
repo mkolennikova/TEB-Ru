@@ -411,7 +411,7 @@ DO JJ=1,SIZE(PT_CAN)
         ZTI_BLD_CLOSED(JJ) = ZTI_BLD(JJ) &
                 + (ZINF(JJ) + ZV_VENT(JJ)) * PTSTEP/T%XBLD_HEIGHT(JJ) * (PT_CAN(JJ) - B%XTI_BLD(JJ)) 
         !
-		IF (PBEM_AC == .TRUE.) THEN
+		IF (PBEM_AC .EQV. .TRUE.) THEN
 			GNAT_VENT(JJ) = (ZTI_BLD_OPEN(JJ) <= DMT%XTCOOL_TARGET (JJ) .AND. &            
                          ZTI_BLD_OPEN(JJ) <  ZTI_BLD_CLOSED(JJ) .AND. &
                          ZTI_BLD_OPEN(JJ) >  DMT%XTHEAT_TARGET (JJ) + 4.)
@@ -572,7 +572,7 @@ DO JJ=1,SIZE(PT_CAN)
     !
     IF (DMT%XH_BLD_COOL(JJ) >= 0.0) THEN
       !
-	  IF (PBEM_AC == .TRUE.) THEN
+	  IF (PBEM_AC .EQV. .TRUE.) THEN
       ! *ideal system
 		IF (BOP%CCOOL_COIL=='IDEAL') THEN
 			!

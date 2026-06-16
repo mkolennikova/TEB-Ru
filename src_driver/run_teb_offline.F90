@@ -46,6 +46,8 @@ USE MODD_FORC_ATM, ONLY: CSV         ,&! name of all scalar variables
                          XPET_B_COEF ,&
                          XPEQ_B_COEF
 
+IMPLICIT NONE
+
 INTEGER :: nsteps                            !IN Number of timesteps
 INTEGER :: JSURF_STEP                        ! Driver loop index
 INTEGER :: INB_ATM                           ! number time the driver calls the TEB
@@ -327,6 +329,28 @@ CHARACTER(LEN=*), PARAMETER       :: namelist_forcing_path = 'namelist/namelist_
 CHARACTER(LEN=100)                :: forcing_path   ! Forcing filepath that we read from namelist
 CHARACTER(:), allocatable         :: forcing_path2  ! Forcing filepath with adjusted length
 
+!===========================================================================
+! NAMELIST declarations
+!===========================================================================
+
+NAMELIST /tebforcing/ forcing_path, lon_teb, lat_teb, hlev_teb, teb_year,   &
+                      teb_month, teb_day, teb_hour, teb_min, nsteps, dt
+
+NAMELIST /tebparam/ urb_h_bld, urb_fr_bld, fr_garden, urb_h2w, teb_road_dir,           &
+                    teb_hroad_dir, teb_wall_opt, teb_ti_bld, teb_qi_bld,               &
+					urb_alb_rf_so, urb_alb_rf_th, urb_hcap_rf, urb_hcon_rf,            &
+					urb_alb_rd_so, urb_alb_rd_th, urb_hcap_rd, urb_hcon_rd,            &
+					urb_alb_wl_so, urb_alb_wl_th, urb_hcap_wl, urb_hcon_wl,            &
+					teb_itype_bem, teb_lbem_ac, teb_itype_natvent, teb_itype_bem_cool, &
+					teb_itype_bem_heat, teb_frac_gz, teb_tcool_target,                 &
+					teb_theat_target, teb_zresidential, teb_dt_res, teb_dt_off,        &
+                    teb_bem_inf, teb_bem_vent, teb_bem_cop, teb_cap_sys_rat,           &
+                    teb_m_sys_rat, teb_cap_sys_heat, ahf_traffic, ahf_industry,        &
+                    teb_itype_wind, teb_fai, teb_lgarden, teb_lgreenroof, teb_frac_gr, &
+                    teb_lsolar_panel, teb_fr_panel, teb_lroad_irrig,                   &
+                    teb_rd_irrig_start_m, teb_rd_irrig_end_m, teb_rd_irrig_start_h,    &
+                    teb_rd_irrig_end_h, teb_rd_irrig_sum, teb_utc_hour	
+
 !============================================================
 !============================================================
 !             PARAMETERS SETUP            
@@ -513,8 +537,6 @@ teb_rd_irrig_sum(:)     = 1.         ! 24h quantity of water used for road water
 ! READ NAMELIST FORCING PARAMETERS
 !===========================================================================
 !===========================================================================
-NAMELIST /tebforcing/ forcing_path, lon_teb, lat_teb, hlev_teb, teb_year,   &
-                      teb_month, teb_day, teb_hour, teb_min, nsteps, dt
 ! Read from file.
 open (action='read', file=namelist_forcing_path, iostat=rc, newunit=fu)
 read (nml=tebforcing, iostat=rc, unit=fu)
@@ -525,20 +547,7 @@ forcing_path2=trim(forcing_path)
 ! READ NAMELIST PARAMETERS
 !===========================================================================
 !===========================================================================
-NAMELIST /tebparam/ urb_h_bld, urb_fr_bld, fr_garden, urb_h2w, teb_road_dir,           &
-                    teb_hroad_dir, teb_wall_opt, teb_ti_bld, teb_qi_bld,               &
-					urb_alb_rf_so, urb_alb_rf_th, urb_hcap_rf, urb_hcon_rf,            &
-					urb_alb_rd_so, urb_alb_rd_th, urb_hcap_rd, urb_hcon_rd,            &
-					urb_alb_wl_so, urb_alb_wl_th, urb_hcap_wl, urb_hcon_wl,            &
-					teb_itype_bem, teb_lbem_ac, teb_itype_natvent, teb_itype_bem_cool, &
-					teb_itype_bem_heat, teb_frac_gz, teb_tcool_target,                 &
-					teb_theat_target, teb_zresidential, teb_dt_res, teb_dt_off,        &
-                    teb_bem_inf, teb_bem_vent, teb_bem_cop, teb_cap_sys_rat,           &
-                    teb_m_sys_rat, teb_cap_sys_heat, ahf_traffic, ahf_industry,        &
-                    teb_itype_wind, teb_fai, teb_lgarden, teb_lgreenroof, teb_frac_gr, &
-                    teb_lsolar_panel, teb_fr_panel, teb_lroad_irrig,                   &
-                    teb_rd_irrig_start_m, teb_rd_irrig_end_m, teb_rd_irrig_start_h,    &
-                    teb_rd_irrig_end_h, teb_rd_irrig_sum, teb_utc_hour					
+				
 ! Read from file.
 open (action='read', file=namelist_path, iostat=rc, newunit=fu)
 read (nml=tebparam, iostat=rc, unit=fu)
@@ -605,10 +614,10 @@ OPEN(UNIT=27, FILE = SOLAR_PROD,ACCESS = 'APPEND',STATUS = 'REPLACE')
 ! Temporal loops
 ! -----------------------------------------------------------
 !
-DO ntstep = 1, nsteps
-    WRITE(*,FMT='(I5,A1,I5)') ntstep,'/',nsteps
+DO nstep = 1, nsteps
+    WRITE(*,FMT='(I5,A1,I5)') nstep,'/',nsteps
 	! read Forcing
-    CALL OL_READ_ATM('ASCII ', 'ASCII ', ntstep, forcing_path2,   &
+    CALL OL_READ_ATM('ASCII ', 'ASCII ', nstep, forcing_path2,   &
                     ZTA,ZQA,ZWIND,ZDIR_SW,ZSCA_SW,ZLW,ZSNOW,ZRAIN,ZPS,&
                     ZDIR )
     
@@ -638,16 +647,16 @@ DO ntstep = 1, nsteps
 	   
 	   ! Update time
 	   teb_hour_seconds = teb_hour_seconds + dt
-	   teb_hour	   = teb_hour_seconds(1) / 3600.
-	   teb_min = mod(teb_hour_seconds(1), 3600.) / 60.
-	   teb_sec = mod(teb_hour_seconds(1), 60.)
+       teb_hour = INT(teb_hour_seconds(1) / 3600.)
+       teb_min  = INT(MOD(teb_hour_seconds(1), 3600.) / 60.)
+       teb_sec  = INT(MOD(teb_hour_seconds(1), 60.))
 	   
 	   CALL ADD_FORECAST_TO_DATE_SURF(teb_year, teb_month, teb_day, teb_hour_seconds)
 
 !*****************************************************************************
 !                  Call of physical routines of TEB is here                  !
 !*****************************************************************************	   
-	   CALL teb_interface (ntstep, nvec, iblock, dt, teb_year, teb_month, teb_day, teb_hour,         &
+	   CALL teb_interface (nstep, nvec, iblock, dt, teb_year, teb_month, teb_day, teb_hour,         &
                 teb_min, teb_sec, teb_hour_seconds, sa_uc, lon_teb, lat_teb, hlev_teb,              &
 				ivstart, ivend, u, v, t, qv, ps, rho, prr_con, prs_con, prr_gsp, prs_gsp, prg_gsp,  &
 				lwd_s, swdir_s, swdifd_s, teb_nroof_layer, teb_nroad_layer, teb_nwall_layer,        &
