@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # Final script to convert Makefile:
-# - keep explicit dependency rules (with :), but remove commands
+# - keep explicit dependency rules, but remove compilation commands
 # - add $(OBJDIR)/ prefix to targets and dependencies
+# - remove all cp commands and localize rules
 # - add generic compilation rules and vpath
 # - add include and module flags to gfortran_args
 
@@ -27,25 +28,33 @@ fi
 sed -i '/^[[:space:]]*$(FC)/d' "$MAKEFILE"
 echo "Removed old compilation commands."
 
-# 3. Add OBJDIR and mkdir after include
+# 3. Remove all cp commands (lines starting with tab and cp)
+sed -i '/^[[:space:]]*cp /d' "$MAKEFILE"
+echo "Removed all cp commands."
+
+# 4. Remove localize target and its dependencies
+sed -i '/^localize:/d' "$MAKEFILE"
+sed -i '/^OFF = /d' "$MAKEFILE"
+echo "Removed localize and OFF."
+
+# 5. Add OBJDIR and mkdir after include
 sed -i "/^include gfortran_args/a OBJDIR = $OBJDIR\n\$(shell mkdir -p \$(OBJDIR))" "$MAKEFILE"
 echo "Added OBJDIR and mkdir."
 
-# 4. Redefine OBJ list with prefix $(OBJDIR)/
+# 6. Redefine OBJ list with prefix $(OBJDIR)/
 sed -i 's/^OBJ = /OBJ = \$(addprefix \$(OBJDIR)\/, /' "$MAKEFILE"
 sed -i '/^OBJ = \$(addprefix .*/ s/$/)/' "$MAKEFILE"
 echo "Updated OBJ list with path to $OBJDIR."
 
-# 5. Transform all rule targets and dependencies to include $(OBJDIR)/
-# This keeps the dependency lines but adds the path to all .o files
+# 7. Transform all rule targets and dependencies to include $(OBJDIR)/
 sed -i '/:/s/ \([^ ]*\)\.o/ $(OBJDIR)\/\1.o/g; s/^\([^ ]*\)\.o:/$(OBJDIR)\/\1.o:/' "$MAKEFILE"
 echo "Updated rule targets and dependencies to use $(OBJDIR)/."
 
-# 6. Remove the localize/copy rules (lines starting with './')
+# 8. Remove lines starting with './' (copy rules for localize)
 sed -i '/^\.\//d' "$MAKEFILE"
-echo "Removed localize/copy rules."
+echo "Removed localize copy rules."
 
-# 7. Append generic build rules and vpath (fallback)
+# 9. Append generic build rules and vpath (fallback)
 cat >> "$MAKEFILE" << 'EOF'
 
 # ----- Generic rules for building into obj/ (fallback) -----
@@ -67,17 +76,17 @@ $(OBJDIR)/%.o: %.f | $(OBJDIR)
 	$(FC) $(CPPDEFS) $(CPPFLAGS) $(FFLAGS) $(OTHERFLAGS) -c $< -o $@
 EOF
 
-# 8. Fix driver1.exe rule
+# 10. Fix driver1.exe rule
 sed -i '/^driver1.exe:/c driver1.exe: $(OBJ) | $(OBJDIR)' "$MAKEFILE"
 sed -i '/^driver1.exe:.*/a \\t$(LD) $(OBJ) -o driver1.exe $(LDFLAGS)' "$MAKEFILE"
 
-# 9. Update clean: remove obj/ and all .mod files anywhere
+# 11. Update clean: remove obj/ and all .mod files anywhere
 sed -i '/^clean:/a \\t-rm -f $(shell find . -name "*.mod" 2>/dev/null)' "$MAKEFILE"
 sed -i '/^clean:/a \\t-rm -rf $(OBJDIR)' "$MAKEFILE"
 
 echo "Added generic compilation rules, fixed driver1.exe and clean."
 
-# 10. Add include and module flags to gfortran_args (if not already present)
+# 12. Add include and module flags to gfortran_args
 if grep -q "\-I. -Isrc_teb" gfortran_args; then
     echo "Include flags already present in gfortran_args."
 else
