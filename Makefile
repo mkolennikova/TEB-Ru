@@ -1,6 +1,7 @@
 # Makefile created by mkmf.pl $Id: mkmf,v 14.0 2007/03/20 22:13:27 fms Exp $ 
 
 include gfortran_args
+EXEC = TEB_offline.exe
 OBJDIR = obj
 
 # Ensure module files go to OBJDIR and include paths are set
@@ -14,7 +15,7 @@ $(shell mkdir -p $(OBJDIR))
 
 .DEFAULT:
 	-touch $@
-all: driver1.exe
+all: $(EXEC)
 $(OBJDIR)/abor1_sfx.o: src_driver/abor1_sfx.F90 $(OBJDIR)/close_file.o $(OBJDIR)/modd_surf_conf.o
 $(OBJDIR)/add_forecast_to_date_surf.o: src_driver/add_forecast_to_date_surf.F90
 $(OBJDIR)/ahf_traffic_now.o: src_driver/ahf_traffic_now.F90
@@ -160,16 +161,15 @@ OBJ = $(addprefix $(OBJDIR)/, snow_cover_1layer.o modi_teb_garden.o modd_reprod_
 clean: neat
 	-rm -rf $(OBJDIR)
 	-rm -f $(shell find . -name "*.mod" 2>/dev/null)
-	-rm -f .cppdefs $(OBJ) *.obj driver1.exe *.mod
+	-rm -f .cppdefs $(OBJ) *.obj $(EXEC) *.mod
 neat:
 	-rm -f $(TMPFILES)
 TAGS: $(SRC)
 	etags $(SRC)
 tags: $(SRC)
 	ctags $(SRC)
-driver1.exe: $(OBJ) | $(OBJDIR)
-	$(LD) $(OBJ) -o driver1.exe $(LDFLAGS)
-	$(LD) $(OBJ) -o driver1.exe  $(LDFLAGS)
+$(EXEC): $(OBJ) | $(OBJDIR)
+	$(LD) $(OBJ) -o $(EXEC) $(LDFLAGS)
 
 # ----- Generic rules for building into obj/ (fallback) -----
 vpath %.F90 src_driver src_teb src_struct src_proxi_SVAT src_solar
