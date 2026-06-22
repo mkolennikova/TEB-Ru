@@ -38,16 +38,14 @@ sed -i "/^include gfortran_args/a \\\\n# Add module search path\nifeq (\$(FC),if
 echo "Added module search flags to Makefile."
 
 # 6. Transform all rule targets and dependencies to include $(OBJDIR)/
-# This replaces patterns like "some_name.o:" with "$(OBJDIR)/some_name.o:"
-# and replaces all ".o" dependencies (except those in variables) with "$(OBJDIR)/...".
 sed -i '/:/s/ \([^ ]*\)\.o/ $(OBJDIR)\/\1.o/g; s/^\([^ ]*\)\.o:/$(OBJDIR)\/\1.o:/' "$MAKEFILE"
 echo "Updated rule targets and dependencies to use $(OBJDIR)/."
 
 # 7. Remove the localize/copy rules (lines starting with './')
 sed -i '/^\.\//d' "$MAKEFILE"
-echo "Removed localize/copy rules to avoid circular dependencies."
+echo "Removed localize/copy rules."
 
-# 8. Append generic build rules and vpath (fallback for any missing explicit rules)
+# 8. Append generic build rules and vpath (fallback)
 cat >> "$MAKEFILE" << 'EOF'
 
 # ----- Generic rules for building into obj/ (fallback) -----
@@ -56,7 +54,6 @@ vpath %.f90 src_driver src_teb src_struct src_proxi_SVAT src_solar
 vpath %.F   src_teb
 vpath %.f   src_teb
 
-# These rules are used if no explicit rule with $(OBJDIR)/%.o exists.
 $(OBJDIR)/%.o: %.F90 | $(OBJDIR)
 	$(FC) $(CPPDEFS) $(CPPFLAGS) $(FFLAGS) $(OTHERFLAGS) -c $< -o $@
 
@@ -74,13 +71,11 @@ EOF
 sed -i '/^driver1.exe:/c driver1.exe: $(OBJ) | $(OBJDIR)' "$MAKEFILE"
 sed -i '/^driver1.exe:.*/a \\t$(LD) $(OBJ) -o driver1.exe $(LDFLAGS)' "$MAKEFILE"
 
-# 10. Update clean
+# 10. Update clean: remove obj/ and all .mod files anywhere (to avoid stale modules)
+sed -i '/^clean:/a \\t-rm -f $(shell find . -name "*.mod" 2>/dev/null)' "$MAKEFILE"
 sed -i '/^clean:/a \\t-rm -rf $(OBJDIR)' "$MAKEFILE"
 
 echo "Added generic compilation rules, fixed driver1.exe and clean."
-
-# 11. Remove any duplicate lines that might have been inserted (optional)
-# Not needed for now.
 
 echo "=== Conversion completed! ==="
 echo "Run 'make clean && make' to build."
