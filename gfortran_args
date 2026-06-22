@@ -10,10 +10,10 @@ LD := $(FC)
 # Compiler flags depending on the chosen compiler
 ifeq ($(FC),ifort)
     # Intel ifort flags
-    FFLAGS = -us -g -O0 -W1 -c -r8 -fpe0 -traceback
+    FFLAGS = -us -g -O0 -W1 -c -r8 -fpe0 -traceback -I. -Isrc_teb
 else
     # GNU gfortran flags
-    FFLAGS = -funderscoring -O0 -g -Wall -c -fmessage-length=0 -fdefault-real-8 -ffpe-trap=invalid,zero -ffree-line-length-0 -Wno-tabs -Wno-unused -Wno-align-commons
+    FFLAGS = -funderscoring -O0 -g -Wall -c -fmessage-length=0 -fdefault-real-8 -ffpe-trap=invalid,zero -ffree-line-length-0 -Wno-tabs -Wno-unused -Wno-align-commons -I. -Isrc_teb
 endif
 
 # Preprocessor flags (if any)
