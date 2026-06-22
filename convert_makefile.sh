@@ -1,11 +1,12 @@
 #!/bin/bash
 
 # Final script to convert Makefile:
-# - keep explicit dependency rules, but remove compilation commands
+# - keep dependency rules, remove compilation commands
 # - add $(OBJDIR)/ prefix to targets and dependencies
-# - remove all cp commands and localize rules
-# - add generic compilation rules and vpath
-# - add include and module flags to gfortran_args
+# - remove cp and localize rules
+# - add module flags directly in Makefile after OBJDIR is defined
+# - add include flags
+# - add generic rules and vpath
 
 set -e
 
@@ -41,20 +42,24 @@ echo "Removed localize and OFF."
 sed -i "/^include gfortran_args/a OBJDIR = $OBJDIR\n\$(shell mkdir -p \$(OBJDIR))" "$MAKEFILE"
 echo "Added OBJDIR and mkdir."
 
-# 6. Redefine OBJ list with prefix $(OBJDIR)/
+# 6. Add module and include flags right after OBJDIR definition
+sed -i "/^OBJDIR = $OBJDIR/a \\\\n# Ensure module files go to OBJDIR and include paths are set\nifeq (\$(FC),ifort)\n    FFLAGS += -module \$(OBJDIR) -I. -Isrc_teb\nelse\n    FFLAGS += -J\$(OBJDIR) -I. -Isrc_teb\nendif" "$MAKEFILE"
+echo "Added module and include flags to Makefile."
+
+# 7. Redefine OBJ list with prefix $(OBJDIR)/
 sed -i 's/^OBJ = /OBJ = \$(addprefix \$(OBJDIR)\/, /' "$MAKEFILE"
 sed -i '/^OBJ = \$(addprefix .*/ s/$/)/' "$MAKEFILE"
 echo "Updated OBJ list with path to $OBJDIR."
 
-# 7. Transform all rule targets and dependencies to include $(OBJDIR)/
+# 8. Transform all rule targets and dependencies to include $(OBJDIR)/
 sed -i '/:/s/ \([^ ]*\)\.o/ $(OBJDIR)\/\1.o/g; s/^\([^ ]*\)\.o:/$(OBJDIR)\/\1.o:/' "$MAKEFILE"
 echo "Updated rule targets and dependencies to use $(OBJDIR)/."
 
-# 8. Remove lines starting with './' (copy rules for localize)
+# 9. Remove lines starting with './' (copy rules for localize)
 sed -i '/^\.\//d' "$MAKEFILE"
 echo "Removed localize copy rules."
 
-# 9. Append generic build rules and vpath (fallback)
+# 10. Append generic build rules and vpath (fallback)
 cat >> "$MAKEFILE" << 'EOF'
 
 # ----- Generic rules for building into obj/ (fallback) -----
@@ -76,38 +81,15 @@ $(OBJDIR)/%.o: %.f | $(OBJDIR)
 	$(FC) $(CPPDEFS) $(CPPFLAGS) $(FFLAGS) $(OTHERFLAGS) -c $< -o $@
 EOF
 
-# 10. Fix driver1.exe rule
+# 11. Fix driver1.exe rule
 sed -i '/^driver1.exe:/c driver1.exe: $(OBJ) | $(OBJDIR)' "$MAKEFILE"
 sed -i '/^driver1.exe:.*/a \\t$(LD) $(OBJ) -o driver1.exe $(LDFLAGS)' "$MAKEFILE"
 
-# 11. Update clean: remove obj/ and all .mod files anywhere
+# 12. Update clean: remove obj/ and all .mod files anywhere
 sed -i '/^clean:/a \\t-rm -f $(shell find . -name "*.mod" 2>/dev/null)' "$MAKEFILE"
 sed -i '/^clean:/a \\t-rm -rf $(OBJDIR)' "$MAKEFILE"
 
 echo "Added generic compilation rules, fixed driver1.exe and clean."
-
-# 12. Add include and module flags to gfortran_args
-if grep -q "\-I. -Isrc_teb" gfortran_args; then
-    echo "Include flags already present in gfortran_args."
-else
-    sed -i '/^FFLAGS = .*gfortran/s/$/ -I. -Isrc_teb/' gfortran_args
-    sed -i '/^FFLAGS = .*ifort/s/$/ -I. -Isrc_teb/' gfortran_args
-    echo "Added -I. -Isrc_teb to gfortran_args."
-fi
-
-if grep -q "\-J\$(OBJDIR)" gfortran_args; then
-    echo "Module flag -J already present in gfortran_args."
-else
-    sed -i '/^FFLAGS = .*gfortran/s/$/ -J$(OBJDIR)/' gfortran_args
-    echo "Added -J$(OBJDIR) to gfortran_args for gfortran."
-fi
-
-if grep -q "\-module \$(OBJDIR)" gfortran_args; then
-    echo "Module flag -module already present in gfortran_args."
-else
-    sed -i '/^FFLAGS = .*ifort/s/$/ -module $(OBJDIR)/' gfortran_args
-    echo "Added -module $(OBJDIR) to gfortran_args for ifort."
-fi
 
 echo "=== Conversion completed! ==="
 echo "Run 'make clean && make' to build."
