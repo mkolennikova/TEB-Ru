@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# Full script to convert Makefile so that all object files and modules
-# are placed into a separate 'obj' directory.
+# Script to convert Makefile: place all objects and modules into 'obj/'
 # Works in Linux / Google Colab.
 
 set -e
@@ -12,32 +11,39 @@ OBJDIR="obj"
 
 echo "=== Converting Makefile to build into $OBJDIR directory ==="
 
-# 1. Create a backup
+# 1. Backup
 if [ -f "$MAKEFILE" ]; then
     cp "$MAKEFILE" "$BACKUP"
     echo "Backup created: $BACKUP"
 else
-    echo "Error: file $MAKEFILE not found!"
+    echo "Error: $MAKEFILE not found!"
     exit 1
 fi
 
-# 2. Remove all old compilation command lines (starting with tab and $(FC))
+# 2. Remove old compilation commands (lines starting with tab and $(FC))
 sed -i '/^[[:space:]]*$(FC)/d' "$MAKEFILE"
 echo "Removed old compilation commands."
 
-# 3. Add OBJDIR variable and directory creation after the include line
+# 3. Add OBJDIR and mkdir after include
 sed -i "/^include gfortran_args/a OBJDIR = $OBJDIR\n\$(shell mkdir -p \$(OBJDIR))" "$MAKEFILE"
 echo "Added OBJDIR and mkdir."
 
-# 4. Redefine OBJ list with prefix $(OBJDIR)/
-# Find the line "OBJ = ..." and replace it with "OBJ = $(addprefix $(OBJDIR)/, ...)"
+# 4. Redefine OBJ with prefix $(OBJDIR)/
 sed -i 's/^OBJ = /OBJ = \$(addprefix \$(OBJDIR)\/, /' "$MAKEFILE"
-# Add closing parenthesis at the end of the OBJ line
 sed -i '/^OBJ = \$(addprefix .*/ s/$/)/' "$MAKEFILE"
 echo "Updated OBJ list with path to $OBJDIR."
 
-# 5. Append generic build rules and vpath to the end of Makefile
-# Use printf to properly insert a tab before commands
+# 5. Add module search flags directly in the Makefile (after include)
+# Insert the conditional block after the include line
+sed -i "/^include gfortran_args/a \\\\n# Add module search path\nifeq (\$(FC),ifort)\n    FFLAGS += -module \$(OBJDIR)\nelse\n    FFLAGS += -J\$(OBJDIR)\nendif" "$MAKEFILE"
+echo "Added module search flags to Makefile."
+
+# 6. Remove the localize and copy rules (to avoid circular deps)
+# Delete lines from './something: ...' up to the end of that block (simple approach: delete all lines starting with './')
+sed -i '/^\.\//d' "$MAKEFILE"
+echo "Removed localize/copy rules to avoid circular dependencies."
+
+# 7. Append generic build rules and vpath
 cat >> "$MAKEFILE" << 'EOF'
 
 # ----- Automatic rules for building into obj/ -----
@@ -59,31 +65,18 @@ $(OBJDIR)/%.o: %.f | $(OBJDIR)
 	$(FC) $(CPPDEFS) $(CPPFLAGS) $(FFLAGS) $(OTHERFLAGS) -c $< -o $@
 EOF
 
-# 6. Fix the driver1.exe rule
+# 8. Fix driver1.exe rule
 sed -i '/^driver1.exe:/c driver1.exe: $(OBJ) | $(OBJDIR)' "$MAKEFILE"
-# Insert the linking command with a tab
 sed -i '/^driver1.exe:.*/a \\t$(LD) $(OBJ) -o driver1.exe $(LDFLAGS)' "$MAKEFILE"
 
-# 7. Update clean: add removal of the obj directory
+# 9. Update clean
 sed -i '/^clean:/a \\t-rm -rf $(OBJDIR)' "$MAKEFILE"
 
 echo "Added generic compilation rules, fixed driver1.exe and clean."
 
-# 8. Add module flags to gfortran_args if not already present
-if grep -q "\-J\$(OBJDIR)" gfortran_args; then
-    echo "Flag -J already present in gfortran_args."
-else
-    sed -i '/^FFLAGS = .*gfortran/s/$/ -J$(OBJDIR)/' gfortran_args
-    echo "Added -J$(OBJDIR) flag to gfortran_args for gfortran."
-fi
-
-if grep -q "\-module \$(OBJDIR)" gfortran_args; then
-    echo "Flag -module already present in gfortran_args."
-else
-    sed -i '/^FFLAGS = .*ifort/s/$/ -module $(OBJDIR)/' gfortran_args
-    echo "Added -module $(OBJDIR) flag to gfortran_args for ifort."
-fi
+# 10. Remove any duplicate lines that might have been inserted (optional)
+# Not needed for now.
 
 echo "=== Conversion completed! ==="
 echo "Run 'make clean && make' to build."
-echo "Backup file: $BACKUP"
+echo "Backup: $BACKUP"
