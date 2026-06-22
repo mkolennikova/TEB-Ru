@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Final script to convert Makefile:
-# - all objects and modules go into 'obj/'
-# - remove explicit rules and copy rules
-# - use generic vpath rules
+# - keep explicit dependency rules (with :), but remove commands
+# - add $(OBJDIR)/ prefix to targets and dependencies
+# - add generic compilation rules and vpath
 # - add include and module flags to gfortran_args
 
 set -e
@@ -36,15 +36,16 @@ sed -i 's/^OBJ = /OBJ = \$(addprefix \$(OBJDIR)\/, /' "$MAKEFILE"
 sed -i '/^OBJ = \$(addprefix .*/ s/$/)/' "$MAKEFILE"
 echo "Updated OBJ list with path to $OBJDIR."
 
-# 5. Remove all explicit .o rules (they interfere with generic rules)
-sed -i '/\.o:/d' "$MAKEFILE"
-echo "Removed all explicit .o rules."
+# 5. Transform all rule targets and dependencies to include $(OBJDIR)/
+# This keeps the dependency lines but adds the path to all .o files
+sed -i '/:/s/ \([^ ]*\)\.o/ $(OBJDIR)\/\1.o/g; s/^\([^ ]*\)\.o:/$(OBJDIR)\/\1.o:/' "$MAKEFILE"
+echo "Updated rule targets and dependencies to use $(OBJDIR)/."
 
 # 6. Remove the localize/copy rules (lines starting with './')
 sed -i '/^\.\//d' "$MAKEFILE"
 echo "Removed localize/copy rules."
 
-# 7. Append generic build rules and vpath (fallback for any missing explicit rules)
+# 7. Append generic build rules and vpath (fallback)
 cat >> "$MAKEFILE" << 'EOF'
 
 # ----- Generic rules for building into obj/ (fallback) -----
