@@ -177,7 +177,8 @@ def prepare_namelist(
     teb_day = start_date.day
     teb_hour = start_date.hour + start_date.minute / 60.0
 
-    if forcing_path[-1] != '/':
+    # Ensure forcing_path ends with a slash
+    if not forcing_path.endswith('/'):
         forcing_path += '/'
 
     # Build namelist dictionary
