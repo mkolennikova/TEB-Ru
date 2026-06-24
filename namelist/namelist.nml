@@ -1,4 +1,5 @@
 &tebparam
+dt = 300.
 teb_utc_hour=3
 urb_h_bld=20.,
 urb_fr_bld=0.62,

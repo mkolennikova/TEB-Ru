@@ -10,7 +10,7 @@ teb_day=20,
 teb_hour=0.,     
 teb_min=0.,
     
-nsteps=17999,  
-dt=300.,      
+nsteps=18000,
+forc_step=1800.,        
     
 / 

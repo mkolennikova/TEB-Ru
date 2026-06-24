@@ -71,7 +71,8 @@ REAL ,DIMENSION(nvec) :: lon_teb             !IN Longitude (deg)
 REAL ,DIMENSION(nvec) :: lat_teb             !IN Latitude (deg)
 REAL ,DIMENSION(nvec) :: hlev_teb            !IN Atm. Forcing height above roof level
 REAL ,DIMENSION(nvec) :: sa_uc               !IN fraction of urban area (need for AHF_TRAFFIC calculation)   
-REAL, DIMENSION(1)    :: dt                  !IN integration timestep
+REAL, DIMENSION(1)    :: dt                  !IN integration timestep (model)
+REAL, DIMENSION(1)    :: forc_step           !IN Forcing time-step (s)
 
 ! Input forcing
 REAL,DIMENSION(nvec) :: u              !IN zonal wind speed
@@ -333,8 +334,8 @@ CHARACTER(:), allocatable         :: forcing_path2  ! Forcing filepath with adju
 ! NAMELIST declarations
 !===========================================================================
 
-NAMELIST /tebforcing/ forcing_path, lon_teb, lat_teb, hlev_teb, teb_year,   &
-                      teb_month, teb_day, teb_hour, teb_min, nsteps, dt
+NAMELIST /tebforcing/ forcing_path, dt, lon_teb, lat_teb, hlev_teb, teb_year,          &
+                      teb_month, teb_day, teb_hour, teb_min, nsteps, forc_step
 
 NAMELIST /tebparam/ urb_h_bld, urb_fr_bld, fr_garden, urb_h2w, teb_road_dir,           &
                     teb_hroad_dir, teb_wall_opt, teb_ti_bld, teb_qi_bld,               &
@@ -370,11 +371,10 @@ teb_day           = 20               ! Current day (UTC)
 teb_hour          = 0                ! Current hour (UTC)
 teb_min           = 0                ! Current minute (UTC)
 teb_sec           = 0                ! Current seconds (UTC)
-dt                = 300.             ! Forcing time-steps
-nsteps            = 17999            ! Number of Forcing time-steps
-INB_ATM           = 6                ! number time the driver calls the TEB
-!                                    ! routines during a forcing time-step
-!                                    ! --> it defines the time-step for TEB
+dt                = 300.             ! Model time-steps
+nsteps            = 18000            ! Number of Forcing time-steps
+forc_step         = 1800             ! Forcing time-step
+
 !============================================================
 ! Settings for Coupled Model (do not change in offline mode) 
 !============================================================
@@ -614,8 +614,10 @@ OPEN(UNIT=27, FILE = SOLAR_PROD,ACCESS = 'APPEND',STATUS = 'REPLACE')
 ! Temporal loops
 ! -----------------------------------------------------------
 !
-DO nstep = 1, nsteps
-    WRITE(*,FMT='(I5,A1,I5)') nstep,'/',nsteps
+INB_ATM = forc_step / dt
+
+DO nstep= 1,nsteps - 1
+   WRITE(*,FMT='(I5,A1,I5)') nstep,'/',nsteps - 1
 	! read Forcing
     CALL OL_READ_ATM('ASCII ', 'ASCII ', nstep, forcing_path2,   &
                     ZTA,ZQA,ZWIND,ZDIR_SW,ZSCA_SW,ZLW,ZSNOW,ZRAIN,ZPS,&
