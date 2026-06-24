@@ -477,11 +477,3 @@ def prepare_forcing(
         )
         if verbose:
             print(f"✅ Plot saved to {plot_file}")
-
-    return {
-        'netcdf_files': downloaded_files,
-        'csv_file': str(csv_file),
-        'forcing_dir': str(forcing_dir),
-        'plot_file': str(plot_file) if save_plot else None,
-        'dataframe': df,
-    }
