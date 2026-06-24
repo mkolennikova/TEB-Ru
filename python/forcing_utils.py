@@ -4,6 +4,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import pandas as pd
+import f90nml
 
 
 def write_forcing(df4point, save_dir):
@@ -130,3 +131,70 @@ def plot_forcing(df, title=None, save_path=None, figsize=(14, 10), resample='aut
 
     plt.show()
     return fig, axes
+
+
+def prepare_namelist(
+    lon,
+    lat,
+    hlev,
+    df,
+    forcing_path='forcing/',
+    output_dir='.',
+    filename='namelist_forcing.nml'):
+    """
+    Create TEB namelist from forcing DataFrame using f90nml.
+
+    Parameters
+    ----------
+    lon, lat, hlev : float
+        Coordinates and height level for the TEB point.
+    df : pandas.DataFrame
+        DataFrame from prepare_df() with forcing variables, indexed by time.
+    forcing_path : str, optional
+        Path to directory containing Forc_*.txt files (as used in namelist).
+    output_dir : str, optional
+        Directory where namelist will be saved.
+    filename : str, optional
+        Name of the namelist file.
+    
+    Returns
+    -------
+    str
+        Path to the created namelist file.
+    """
+    # Ensure datetime index
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
+
+    # Extract parameters from DataFrame
+    start_date = df.index[0]
+    nsteps = len(df)
+    forc_step = (df.index[1] - df.index[0]).total_seconds() if len(df) > 1 else 1800.0
+
+    # Date components
+    teb_year = start_date.year
+    teb_month = start_date.month
+    teb_day = start_date.day
+    teb_hour = start_date.hour + start_date.minute / 60.0
+
+    # Build namelist dictionary
+    nml = {
+        'tebforcing': {
+            'forcing_path': forcing_path,
+            'lon_teb': float(lon),
+            'lat_teb': float(lat),
+            'hlev_teb': float(hlev),
+            'teb_year': int(teb_year),
+            'teb_month': int(teb_month),
+            'teb_day': int(teb_day),
+            'teb_hour': round(teb_hour, 2),
+            'teb_min': 0.0,
+            'nsteps': int(nsteps),
+            'forc_step': float(forc_step),
+        }
+    }
+
+    # Write namelist file
+    os.makedirs(output_dir, exist_ok=True)
+    out_file = os.path.join(output_dir, filename)
+    f90nml.write(nml, out_file, force=True)

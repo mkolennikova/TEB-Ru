@@ -8,7 +8,7 @@ import shutil
 import numpy as np
 import pandas as pd
 import xarray as xr
-from forcing_utils import plot_forcing, write_forcing
+from forcing_utils import plot_forcing, write_forcing, prepare_namelist
 
 
 from pathlib import Path
@@ -461,6 +461,20 @@ def prepare_forcing(
     write_forcing(df_sorted, str(forcing_dir) + '/')
     if verbose:
         print(f"✅ Forcing files written to {forcing_dir}")
+
+        # 5. Write namelist
+    if verbose:
+        print("📝 Writing namelist...")
+    
+    namelist_filename = "namelist_forcing.nml"
+    prepare_namelist(lon=lon, lat=lat, hlev=10.0,
+                     df=df_sorted,
+                     forcing_path=str(forcing_dir.absolute()),  # absolute path
+                     output_dir=str(base_path), 
+                     filename=namelist_filename)
+    
+    if verbose:
+        print(f"✅ Namelist saved to {base_path / namelist_filename}")
 
     # ------------------------------------------------------------------
     # 5. Plot and save figure
