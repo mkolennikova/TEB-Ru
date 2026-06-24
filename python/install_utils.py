@@ -8,14 +8,14 @@ DEFAULT_EXTERNAL_MODULES = ['f90nml', 'cdsapi']
 
 def import_extrernal_modules (extra_module_names = DEFAULT_EXTERNAL_MODULES):
     for module_name in extra_module_names:
-    spec = importlib.util.find_spec(module_name)
-    if spec is not None:
-        print(f"'{module_name}' exists.")
-    else:
-        print(f"'{module_name}' does not exist.")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", module_name])
-        print(f"'{module_name}' installed ")
-    importlib.import_module (module_name)
+        spec = importlib.util.find_spec(module_name)
+        if spec is not None:
+            print(f"'{module_name}' exists.")
+        else:
+            print(f"'{module_name}' does not exist.")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", module_name])
+            print(f"'{module_name}' installed ")
+        importlib.import_module (module_name)
 
 
 def init_CDS (url, key):
