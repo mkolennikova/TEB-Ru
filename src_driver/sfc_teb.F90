@@ -64,7 +64,7 @@ SUBROUTINE teb_interface (ntstep, nvec, iblock, dt, teb_year, teb_month, teb_day
 	INTEGER :: ivend                             !IN optional end   index                   ! ivend
 	INTEGER :: iblock                                     !IN number of block
 	INTEGER :: i
-	REAL,DIMENSION(1)  :: dt             !IN integration timestep
+	REAL    :: dt             !IN integration timestep
 	
 	INTEGER                           :: &
 									 teb_year           , &            ! current year

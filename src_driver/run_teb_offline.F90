@@ -71,8 +71,8 @@ REAL ,DIMENSION(nvec) :: lon_teb             !IN Longitude (deg)
 REAL ,DIMENSION(nvec) :: lat_teb             !IN Latitude (deg)
 REAL ,DIMENSION(nvec) :: hlev_teb            !IN Atm. Forcing height above roof level
 REAL ,DIMENSION(nvec) :: sa_uc               !IN fraction of urban area (need for AHF_TRAFFIC calculation)   
-REAL, DIMENSION(1)    :: dt                  !IN integration timestep (model)
-REAL, DIMENSION(1)    :: forc_step           !IN Forcing time-step (s)
+REAL                  :: dt                  !IN integration timestep (model)
+REAL                  :: forc_step           !IN Forcing time-step (s)
 
 ! Input forcing
 REAL,DIMENSION(nvec) :: u              !IN zonal wind speed
