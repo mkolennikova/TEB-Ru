@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 DEFAULT_EXTERNAL_MODULES = ['f90nml', 'cdsapi']
+DEFAULT_CDS_URL = "https://cds.climate.copernicus.eu/api"
 
 def import_extrernal_modules (extra_module_names = DEFAULT_EXTERNAL_MODULES):
     for module_name in extra_module_names:
@@ -20,9 +21,12 @@ def import_extrernal_modules (extra_module_names = DEFAULT_EXTERNAL_MODULES):
 
 def init_CDS (url = None, key = None):
     if url is None:
-        url = input("Enter the URL of the CDS API: ")
+        url = input("Enter the URL of the CDS API (if empty, will use default): ")
+        if not url:
+            url = DEFAULT_CDS_URL
     if key is None:
         key = input("Enter your API key: ")
+    
     # Locate the user's home directory across Linux, macOS, or Windows
     home_dir = Path.home()
     config_file = home_dir / ".cdsapirc"
