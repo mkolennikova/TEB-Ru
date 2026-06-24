@@ -3,8 +3,8 @@ import os
 from collections import deque
 from IPython.display import clear_output  # only for Jupyter/Colab
 
-def run_and_log(exe_path, log_file, num_lines=3, cwd=None, args=None,
-                update_every_n_lines=5, use_carriage_return_handling=False):
+def run_in_cell (exe_path, log_file, num_lines=5, cwd=None, args=None,
+                 update_every_n_lines=5, use_carriage_return_handling=False):
     """
     Run a command, log all output to a file, and display the last `num_lines`
     lines in the Jupyter/Colab cell, updating periodically.
