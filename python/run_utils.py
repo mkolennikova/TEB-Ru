@@ -3,96 +3,116 @@ import os
 from collections import deque
 from IPython.display import clear_output  # only for Jupyter/Colab
 
-def run_executable(exe_path, log_file, num_lines=3, cwd=None, args=None):
+def run_and_log(exe_path, log_file, num_lines=3, cwd=None, args=None,
+                update_every_n_lines=5, use_carriage_return_handling=False):
     """
-    Run an executable, capture its output to a log file, and display the last
-    `num_lines` lines in real-time (updated in the same cell).
+    Run a command, log all output to a file, and display the last `num_lines`
+    lines in the Jupyter/Colab cell, updating periodically.
+
+    For commands that output progress using `\r` (e.g., long-running simulators),
+    set use_carriage_return_handling=True (default) to capture every update.
+    For commands that output plain lines with `\n` (e.g., make, compilers),
+    set use_carriage_return_handling=False, and the display will update every
+    `update_every_n_lines` new lines to reduce flickering.
 
     Args:
-        exe_path (str): Path to the executable.
-        log_file (str): Name/path of the log file to write full output to.
-        num_lines (int): Number of recent lines to display on screen (default 3).
-        cwd (str, optional): Working directory for the process (default: current).
-        args (list, optional): Additional command-line arguments.
+        exe_path (str): Path to the executable/command.
+        log_file (str): File to save the full output.
+        num_lines (int): Number of recent lines to show on screen.
+        cwd (str, optional): Working directory.
+        args (list, optional): Additional arguments.
+        update_every_n_lines (int): Update screen every N new lines (only for
+                                    normal `\n` output, ignored if \r handling).
+        use_carriage_return_handling (bool): If True, handle `\r` byte-by-byte
+                                             (for progress bars). If False,
+                                             read line-by-line.
 
     Returns:
-        int: The return code of the process.
+        int: Return code of the process.
     """
-    # Build the full command list
     cmd = [exe_path] + (args if args else [])
 
-    # Open the log file (overwrite if exists)
     with open(log_file, 'w', encoding='utf-8') as log_f:
-        # Start the process, merging stdout and stderr
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            cwd=cwd,
-            bufsize=0          # unbuffered for byte-by-byte reading
-        )
+        if use_carriage_return_handling:
+            # ---- Byte-by-byte reading for progress bars with \r ----
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=cwd,
+                bufsize=0
+            )
+            current_line = ""
+            last_lines = deque(maxlen=num_lines)
 
-        # Buffer for the current line (between \r or \n)
-        current_line = ""
-        # Deque to keep the last `num_lines` lines for display
-        last_lines = deque(maxlen=num_lines)
+            def update_display():
+                clear_output(wait=True)
+                for line in list(last_lines)[-num_lines:]:
+                    print(line)
 
-        def update_display():
-            """Refresh the cell output with the latest lines."""
-            clear_output(wait=True)
-            # Show only the most recent lines (last `num_lines`)
-            for line in list(last_lines)[-num_lines:]:
-                print(line)
+            while True:
+                ch = proc.stdout.read(1)
+                if not ch:
+                    break
+                try:
+                    char = ch.decode('utf-8', errors='ignore')
+                except UnicodeDecodeError:
+                    continue
 
-        # Read the output byte by byte to handle both \r and \n properly
-        while True:
-            chunk = proc.stdout.read(1)
-            if not chunk:
-                break
-            try:
-                char = chunk.decode('utf-8', errors='ignore')
-            except UnicodeDecodeError:
-                continue
-
-            if char == '\r':
-                # Carriage return – finalise the current line (progress update)
-                if current_line:
-                    # Write to log file (each update as a separate line)
-                    log_f.write(current_line + '\n')
-                    log_f.flush()
-                    # Store and update the display
-                    last_lines.append(current_line)
-                    update_display()
-                    current_line = ""
-            elif char == '\n':
-                # Newline – finalise the line if it has content
-                if current_line:
-                    log_f.write(current_line + '\n')
-                    log_f.flush()
-                    last_lines.append(current_line)
-                    update_display()
-                    current_line = ""
+                if char == '\r':
+                    if current_line:
+                        log_f.write(current_line + '\n')
+                        log_f.flush()
+                        last_lines.append(current_line)
+                        update_display()
+                        current_line = ""
                 else:
-                    # Empty line – just write a newline to the log
-                    log_f.write('\n')
-                    log_f.flush()
-            else:
-                # Ordinary character – accumulate to the current line
-                current_line += char
+                    current_line += char
 
-        # Process finished – handle any remaining output
-        if current_line:
-            log_f.write(current_line + '\n')
-            log_f.flush()
-            last_lines.append(current_line)
-            update_display()
+            if current_line:
+                log_f.write(current_line + '\n')
+                log_f.flush()
+                last_lines.append(current_line)
+                update_display()
 
-        # Wait for the process to finish and get its return code
-        return_code = proc.wait()
+            return_code = proc.wait()
 
-    # Final screen update: show the last lines and a completion message
-    clear_output(wait=True)
-    for line in list(last_lines)[-num_lines:]:
-        print(line)
+        else:
+            # ---- Line-by-line reading for normal \n output ----
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=cwd,
+                text=True,
+                bufsize=1
+            )
+            last_lines = deque(maxlen=num_lines)
+            line_counter = 0
+
+            for line in proc.stdout:
+                # Write to log immediately
+                log_f.write(line)
+                log_f.flush()
+
+                # Strip newline and store
+                stripped = line.rstrip('\n')
+                if stripped:
+                    last_lines.append(stripped)
+                    line_counter += 1
+
+                # Update screen every N lines
+                if line_counter % update_every_n_lines == 0:
+                    clear_output(wait=True)
+                    for l in list(last_lines)[-num_lines:]:
+                        print(l)
+
+            # Final update after process ends
+            clear_output(wait=True)
+            for l in list(last_lines)[-num_lines:]:
+                print(l)
+            return_code = proc.wait()
+
+    # Print final completion message
     print(f"✅ Process finished (return code {return_code}). Full log saved to '{log_file}'.")
     return return_code
