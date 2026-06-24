@@ -1,3 +1,4 @@
+
 import cdsapi
 import re
 import os
@@ -30,11 +31,23 @@ DEF_FORCING_VARIABLES = [
 #'precipitation_type',                             # ptype
 
 
-def download_chunk(chunk_start, chunk_end, chunk_file, base_request, verbose=True):
+def download_chunk(chunk_start, chunk_end, chunk_file, base_request, verbose=True, force_reload=False):
     """
     Download a single time chunk using the timeseries dataset.
     Handles ZIP archive with one NetCDF file inside.
     """
+    # Check if file already exists
+    if os.path.exists(chunk_file) and not force_reload:
+        if verbose:
+            print(f"⏭️ File already exists, skipping: {chunk_file}")
+        return chunk_file
+
+    # If force_reload and file exists, remove it
+    if os.path.exists(chunk_file) and force_reload:
+        os.remove(chunk_file)
+        if verbose:
+            print(f"🔄 Removing existing file for reload: {chunk_file}")
+
     client = cdsapi.Client()
     request = base_request.copy()
     request['date'] = f"{chunk_start}/{chunk_end}"
@@ -54,7 +67,6 @@ def download_chunk(chunk_start, chunk_end, chunk_file, base_request, verbose=Tru
             names = zf.namelist()
             zf.extractall(extract_dir)
         os.remove(temp_file)
-        # Usually there is exactly one file; take the first one
         if names:
             src = os.path.join(extract_dir, names[0])
             shutil.move(src, chunk_file)
@@ -80,6 +92,7 @@ def download(
     time=None,
     chunk_by=None,
     verbose=True,
+    force_reload=False,
     max_workers=1,
 ):
     """
@@ -197,7 +210,7 @@ def download(
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {}
             for (chunk_start, chunk_end), chunk_file in zip(chunks, chunk_files):
-                future = executor.submit(download_chunk, chunk_start, chunk_end, chunk_file, base_request, verbose)
+                future = executor.submit(download_chunk, chunk_start, chunk_end, chunk_file, base_request, verbose, force_reload)
                 futures[future] = chunk_file
             for future in as_completed(futures):
                 try:
@@ -365,6 +378,7 @@ def prepare_forcing(
     chunk_by=None,
     max_workers=1,
     verbose=True,
+    force_reload=False,
     save_plot=True,
     plot_title=None,
 ):
@@ -415,19 +429,18 @@ def prepare_forcing(
     # ------------------------------------------------------------------
     if verbose:
         print(f"📥 Downloading ERA5 data for ({lat}, {lon}) from {start_date} to {end_date}...")
-    downloaded_files = download(
-        lat=lat,
-        lon=lon,
-        start_date=start_date,
-        end_date=end_date,
-        variables=variables,
-        output_file=str(netcdf_file),
-        output_dir=None,   # we already gave full path in output_file
-        time=time,
-        chunk_by=chunk_by,
-        verbose=verbose,
-        max_workers=max_workers,
-    )
+    downloaded_files = download(lat=lat,
+                                lon=lon,
+                                start_date=start_date,
+                                end_date=end_date,
+                                variables=variables,
+                                output_file=str(netcdf_file),
+                                output_dir=None,   # we already gave full path in output_file
+                                time=time,
+                                chunk_by=chunk_by,
+                                verbose=verbose,
+                                force_reload=force_reload,
+                                max_workers=max_workers)
     if verbose:
         print(f"✅ Downloaded {len(downloaded_files)} file(s) to {netcdf_dir}")
 
