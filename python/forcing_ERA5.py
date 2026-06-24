@@ -251,23 +251,16 @@ def convert_nc2df(
         raise FileNotFoundError(f"No files found matching pattern: {file_pattern}")
 
     # Open dataset(s)
-    try:
-        if len(files) == 1:
+    if len(files) == 1:
+        if engine is not None:
             ds = xr.open_dataset(files[0], engine=engine)
         else:
-            ds = xr.open_mfdataset(
-                files,
-                combine='by_coords',
-                parallel=True,
-                engine=engine,
-            )
-    except ValueError as e:
-        if engine is None and "did not find a match" in str(e):
-            raise ValueError(
-                "xarray could not determine the file format. Please specify engine='netcdf4' "
-                "or engine='cfgrib' (for GRIB)."
-            ) from e
-        raise
+            ds = xr.open_dataset(files[0])
+    else:
+        if engine is not None:
+            ds = xr.open_mfdataset(files, combine='by_coords', parallel=True, engine=engine)
+        else:
+            ds = xr.open_mfdataset(files, combine='by_coords', parallel=True)
 
     # Rename coordinates if needed
     if 'latitude' not in ds.coords and 'longitude' not in ds.coords:
