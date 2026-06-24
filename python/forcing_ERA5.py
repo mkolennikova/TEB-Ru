@@ -453,9 +453,7 @@ def prepare_forcing(
         input_path=str(netcdf_dir),   # read all .nc files in the directory
         lat=lat,
         lon=lon,
-        output_file=str(csv_file),
-        engine='netcdf4',
-    )
+        output_file=str(csv_file))
     if verbose:
         print(f"✅ DataFrame saved to {csv_file}")
 
