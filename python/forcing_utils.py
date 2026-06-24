@@ -83,7 +83,7 @@ def plot_forcing(df, title=None, save_path=None, figsize=(14, 10), resample='aut
     color1 = 'tab:red'
     ax.set_xlabel('')
     ax.set_ylabel('Temperature (°C)', color=color1)
-    ax.plot(df_plot.index, df_plot['Forc_TA'], color=color1, linewidth=1.5)
+    ax.plot(df_plot.index, df_plot['Forc_TA'] - 273.15, color=color1, linewidth=1.5)
     ax.tick_params(axis='y', labelcolor=color1)
     ax.grid(True, linestyle='--', alpha=0.3)
 

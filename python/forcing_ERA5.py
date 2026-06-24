@@ -329,7 +329,7 @@ def convert_nc2df(
         snow = tp_mm_s.where(t2m_c <= 0, other=0)
 
     forcing_ds = xr.Dataset({
-        'Forc_TA': t2m_c,
+        'Forc_TA': point['t2m'],
         'Forc_QA': q,
         'Forc_WIND': wind_speed,
         'Forc_DIR': wind_dir,
