@@ -18,7 +18,11 @@ def import_extrernal_modules (extra_module_names = DEFAULT_EXTERNAL_MODULES):
         importlib.import_module (module_name)
 
 
-def init_CDS (url, key):
+def init_CDS (url = None, key = None):
+    if url is None:
+        url = input("Enter the URL of the CDS API: ")
+    if key is None:
+        key = input("Enter your API key: ")
     # Locate the user's home directory across Linux, macOS, or Windows
     home_dir = Path.home()
     config_file = home_dir / ".cdsapirc"
