@@ -46,6 +46,7 @@ Open and run the [`run_in_collab.ipynb`](https://github.com/mkolennikova/TEB-Ru/
 
 To build and run TEB-Ru locally:
 
+```bash
 # Clone the repository
 git clone https://github.com/mkolennikova/TEB-Ru.git
 cd TEB-Ru
@@ -59,6 +60,7 @@ make
 
 # Run the model
 ./TEB_offline.exe
+```
 
 ## Configuration
 
