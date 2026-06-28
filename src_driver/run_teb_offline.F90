@@ -310,22 +310,26 @@ REAL, DIMENSION(:,:), ALLOCATABLE :: ZDIR   ! wind direction
 ! -----------------------------------------------------------                        
 ! Outputs                                                                            
 ! -----------------------------------------------------------                        
-!                                                                                    
-CHARACTER(LEN=*), PARAMETER       :: T_ROOF1 = 'output/T_ROOF1.txt'                  
-CHARACTER(LEN=*), PARAMETER       :: T_CANYON = 'output/T_CANYON.txt'                
-CHARACTER(LEN=*), PARAMETER       :: T_ROAD1 = 'output/T_ROAD1.txt'                  
-CHARACTER(LEN=*), PARAMETER       :: T_WALLA1= 'output/T_WALLA1.txt'                 
-CHARACTER(LEN=*), PARAMETER       :: T_WALLB1= 'output/T_WALLB1.txt'                 
-CHARACTER(LEN=*), PARAMETER       :: TI_BLD = 'output/TI_BLD.txt'                    
-CHARACTER(LEN=*), PARAMETER       :: Q_CANYON = 'output/Q_CANYON.txt'                
-CHARACTER(LEN=*), PARAMETER       :: P_CANYON = 'output/P_CANYON.txt'                
-CHARACTER(LEN=*), PARAMETER       :: U_CANYON = 'output/U_CANYON.txt'                
-CHARACTER(LEN=*), PARAMETER       :: H_TOWN = 'output/H_TOWN.txt'                    
-CHARACTER(LEN=*), PARAMETER       :: LE_TOWN = 'output/LE_TOWN.txt'                  
-CHARACTER(LEN=*), PARAMETER       :: RN_TOWN = 'output/RN_TOWN.txt'                  
-CHARACTER(LEN=*), PARAMETER       :: HVAC_COOL = 'output/HVAC_COOL.txt'              
-CHARACTER(LEN=*), PARAMETER       :: HVAC_HEAT = 'output/HVAC_HEAT.txt'
-CHARACTER(LEN=*), PARAMETER       :: SOLAR_PROD = 'output/SOLAR_PROD.txt'
+!    
+CHARACTER(LEN=100) :: output_dir
+CHARACTER(LEN=100) :: T_ROOF1, T_CANYON, T_ROAD1, T_WALLA1, T_WALLB1, TI_BLD, &
+                      Q_CANYON, P_CANYON, U_CANYON, H_TOWN, LE_TOWN, RN_TOWN, &
+                      HVAC_COOL, HVAC_HEAT, SOLAR_PROD
+! CHARACTER(LEN=*), PARAMETER       :: T_ROOF1 = 'output/T_ROOF1.txt'                  
+! CHARACTER(LEN=*), PARAMETER       :: T_CANYON = 'output/T_CANYON.txt'                
+! CHARACTER(LEN=*), PARAMETER       :: T_ROAD1 = 'output/T_ROAD1.txt'                  
+! CHARACTER(LEN=*), PARAMETER       :: T_WALLA1= 'output/T_WALLA1.txt'                 
+! CHARACTER(LEN=*), PARAMETER       :: T_WALLB1= 'output/T_WALLB1.txt'                 
+! CHARACTER(LEN=*), PARAMETER       :: TI_BLD = 'output/TI_BLD.txt'                    
+! CHARACTER(LEN=*), PARAMETER       :: Q_CANYON = 'output/Q_CANYON.txt'                
+! CHARACTER(LEN=*), PARAMETER       :: P_CANYON = 'output/P_CANYON.txt'                
+! CHARACTER(LEN=*), PARAMETER       :: U_CANYON = 'output/U_CANYON.txt'                
+! CHARACTER(LEN=*), PARAMETER       :: H_TOWN = 'output/H_TOWN.txt'                    
+! CHARACTER(LEN=*), PARAMETER       :: LE_TOWN = 'output/LE_TOWN.txt'                  
+! CHARACTER(LEN=*), PARAMETER       :: RN_TOWN = 'output/RN_TOWN.txt'                  
+! CHARACTER(LEN=*), PARAMETER       :: HVAC_COOL = 'output/HVAC_COOL.txt'              
+! CHARACTER(LEN=*), PARAMETER       :: HVAC_HEAT = 'output/HVAC_HEAT.txt'
+! CHARACTER(LEN=*), PARAMETER       :: SOLAR_PROD = 'output/SOLAR_PROD.txt'
 ! -----------------------------------------------------------                        
 ! Namelist paths                                                                            
 ! -----------------------------------------------------------                                      
@@ -338,6 +342,8 @@ CHARACTER(LEN=100)                :: namelist_forcing_path_local
 
 CHARACTER(LEN=100)                :: forcing_path   ! Forcing filepath that we read from namelist
 CHARACTER(:), allocatable         :: forcing_path2  ! Forcing filepath with adjusted length
+
+INTEGER :: i  ! Loop counter for command line arguments
 
 !===========================================================================
 ! NAMELIST declarations
@@ -371,54 +377,79 @@ NAMELIST /tebparam/ dt, urb_h_bld, urb_fr_bld, fr_garden, urb_h2w, teb_road_dir,
 
 
 !===========================================================================
-! Process command line arguments
+! Process command line arguments with keys
 !===========================================================================
 num_args = COMMAND_ARGUMENT_COUNT()
 
-! Set default paths
-namelist_path_local = TRIM(namelist_path_default)
+! Initialize variables
 namelist_forcing_path_local = TRIM(namelist_forcing_path_default)
+namelist_path_local = TRIM(namelist_path_default)
+output_dir = 'output/'
 
-! Check if arguments were provided
-IF (num_args >= 1) THEN
-    CALL GET_COMMAND_ARGUMENT(1, arg1)
-    arg1_exists = .TRUE.
-    namelist_forcing_path_local = TRIM(arg1)
-ELSE
-    arg1_exists = .FALSE.
-END IF
-
-IF (num_args >= 2) THEN
-    CALL GET_COMMAND_ARGUMENT(2, arg2)
-    arg2_exists = .TRUE.
-    namelist_path_local = TRIM(arg2)
-ELSE
-    arg2_exists = .FALSE.
-END IF
-
-! Print usage information if more than 2 arguments
-IF (num_args > 2) THEN
-    WRITE(*,*) 'Usage: ./TEB_offline.exe [namelist_forcing_path] [namelist_path]'
-    WRITE(*,*) '  If no arguments provided, default paths are used:'
-    WRITE(*,*) '    namelist_forcing_path = ', TRIM(namelist_forcing_path_default)
-    WRITE(*,*) '    namelist_path         = ', TRIM(namelist_path_default)
-    WRITE(*,*) '  If one argument provided, it is used as forcing namelist path.'
-    WRITE(*,*) '  If two arguments provided, first is forcing namelist, second is parameter namelist.'
-    STOP
+! Parse arguments
+IF (num_args > 0) THEN
+    i = 1
+    DO WHILE (i <= num_args)
+        CALL GET_COMMAND_ARGUMENT(i, arg1)
+        
+        SELECT CASE (TRIM(arg1))
+        CASE ('-forcing_nml')
+            IF (i+1 <= num_args) THEN
+                CALL GET_COMMAND_ARGUMENT(i+1, arg2)
+                namelist_forcing_path_local = TRIM(arg2)
+                i = i + 1
+            ELSE
+                WRITE(*,*) 'ERROR: Missing value for -forcing_nml'
+                CALL PRINT_USAGE()
+                STOP 1
+            END IF
+            
+        CASE ('-param_nml')
+            IF (i+1 <= num_args) THEN
+                CALL GET_COMMAND_ARGUMENT(i+1, arg2)
+                namelist_path_local = TRIM(arg2)
+                i = i + 1
+            ELSE
+                WRITE(*,*) 'ERROR: Missing value for -param_nml'
+                CALL PRINT_USAGE()
+                STOP 1
+            END IF
+            
+        CASE ('-output')
+            IF (i+1 <= num_args) THEN
+                CALL GET_COMMAND_ARGUMENT(i+1, arg2)
+                output_dir = TRIM(arg2)
+                ! Ensure trailing slash
+                IF (output_dir(LEN_TRIM(output_dir):LEN_TRIM(output_dir)) /= '/') THEN
+                    output_dir = TRIM(output_dir) // '/'
+                END IF
+                i = i + 1
+            ELSE
+                WRITE(*,*) 'ERROR: Missing value for -output'
+                CALL PRINT_USAGE()
+                STOP 1
+            END IF
+            
+        CASE ('-h', '-help', '--help')
+            CALL PRINT_USAGE()
+            STOP 0
+            
+        CASE DEFAULT
+            WRITE(*,*) 'ERROR: Unknown option: ', TRIM(arg1)
+            CALL PRINT_USAGE()
+            STOP 1
+        END SELECT
+        
+        i = i + 1
+    END DO
 END IF
 
 ! Print information about which files are being used
 WRITE(*,*) '----------------------------------------------------'
 WRITE(*,*) 'TEB-Ru Offline Model'
-IF (num_args == 0) THEN
-    WRITE(*,*) 'Using default namelist files:'
-ELSE IF (num_args == 1) THEN
-    WRITE(*,*) 'Using custom forcing namelist file:'
-ELSE
-    WRITE(*,*) 'Using custom namelist files:'
-END IF
 WRITE(*,*) '  Forcing namelist: ', TRIM(namelist_forcing_path_local)
 WRITE(*,*) '  Parameter namelist: ', TRIM(namelist_path_local)
+WRITE(*,*) '  Output directory: ', TRIM(output_dir)
 WRITE(*,*) '----------------------------------------------------'
 
                     ! Basic Settings of Location and Forcing
@@ -612,12 +643,12 @@ IF (rc > 0) THEN
     WRITE(*,*) 'WARNING: Issues reading forcing namelist from: ', TRIM(namelist_forcing_path_local)
     WRITE(*,*) 'IOSTAT = ', rc
     WRITE(*,*) 'Attempting to continue...'
-    CALL SLEEP(1)  ! Pause for 1 second
+    CALL SLEEP(2)  ! Pause for 2 second
 ELSE IF (rc < 0) THEN
     WRITE(*,*) 'WARNING: End of file reached while reading forcing namelist: ', TRIM(namelist_forcing_path_local)
     WRITE(*,*) 'IOSTAT = ', rc
     WRITE(*,*) 'Attempting to continue...'
-    CALL SLEEP(1)  ! Pause for 1 second
+    CALL SLEEP(2)  ! Pause for 2 second
 END IF
 CLOSE(fu)
 forcing_path2=trim(forcing_path)
@@ -644,12 +675,12 @@ IF (rc > 0) THEN
     WRITE(*,*) 'WARNING: Issues reading parameter namelist from: ', TRIM(namelist_path_local)
     WRITE(*,*) 'IOSTAT = ', rc
     WRITE(*,*) 'Attempting to continue...'
-    CALL SLEEP(1)  ! Pause for 1 second
+    CALL SLEEP(2)  ! Pause for 2 second
 ELSE IF (rc < 0) THEN
     WRITE(*,*) 'WARNING: End of file reached while reading parameter namelist: ', TRIM(namelist_path_local)
     WRITE(*,*) 'IOSTAT = ', rc
     WRITE(*,*) 'Attempting to continue...'
-    CALL SLEEP(1)  ! Pause for 1 second
+    CALL SLEEP(2)  ! Pause for 2 second
 END IF
 CLOSE(fu)
 
@@ -695,6 +726,24 @@ teb_hour_seconds = teb_hour * 3600. + teb_min * 60. + teb_sec
 ! Outputs
 ! -----------------------------------------------------------
 !
+
+! Set output file paths
+T_ROOF1   = TRIM(output_dir)//'T_ROOF1.txt'
+T_CANYON  = TRIM(output_dir)//'T_CANYON.txt'
+T_ROAD1   = TRIM(output_dir)//'T_ROAD1.txt'
+T_WALLA1  = TRIM(output_dir)//'T_WALLA1.txt'
+T_WALLB1  = TRIM(output_dir)//'T_WALLB1.txt'
+TI_BLD    = TRIM(output_dir)//'TI_BLD.txt'
+Q_CANYON  = TRIM(output_dir)//'Q_CANYON.txt'
+P_CANYON  = TRIM(output_dir)//'P_CANYON.txt'
+U_CANYON  = TRIM(output_dir)//'U_CANYON.txt'
+H_TOWN    = TRIM(output_dir)//'H_TOWN.txt'
+LE_TOWN   = TRIM(output_dir)//'LE_TOWN.txt'
+RN_TOWN   = TRIM(output_dir)//'RN_TOWN.txt'
+HVAC_COOL = TRIM(output_dir)//'HVAC_COOL.txt'
+HVAC_HEAT = TRIM(output_dir)//'HVAC_HEAT.txt'
+SOLAR_PROD= TRIM(output_dir)//'SOLAR_PROD.txt'
+
 OPEN(UNIT=13, FILE = T_ROOF1,   ACCESS = 'APPEND',STATUS = 'REPLACE')
 OPEN(UNIT=14, FILE = T_CANYON,  ACCESS = 'APPEND',STATUS = 'REPLACE')
 OPEN(UNIT=15, FILE = T_ROAD1,   ACCESS = 'APPEND',STATUS = 'REPLACE')
@@ -856,4 +905,28 @@ CLOSE(27)
 !
 ! --------------------------------------------------------------------------------------
 !
+CONTAINS
+
+SUBROUTINE PRINT_USAGE()
+    WRITE(*,*) ''
+    WRITE(*,*) 'Usage: ./TEB_offline.exe [options]'
+    WRITE(*,*) ''
+    WRITE(*,*) 'Options:'
+    WRITE(*,*) '  -forcing_nml <path>    Path to forcing namelist file'
+    WRITE(*,*) '                          (default: namelist/namelist_forcing.nml)'
+    WRITE(*,*) '  -param_nml <path>      Path to parameter namelist file'
+    WRITE(*,*) '                          (default: namelist/namelist.nml)'
+    WRITE(*,*) '  -output <dir>          Output directory for model results'
+    WRITE(*,*) '                          (default: output/)'
+    WRITE(*,*) '  -h, -help, --help      Show this help message'
+    WRITE(*,*) ''
+    WRITE(*,*) 'Examples:'
+    WRITE(*,*) '  ./TEB_offline.exe'
+    WRITE(*,*) '  ./TEB_offline.exe -forcing_nml my_forcing.nml -param_nml my_params.nml'
+    WRITE(*,*) '  ./TEB_offline.exe -forcing_nml my_forcing.nml -output my_results/'
+    WRITE(*,*) '  ./TEB_offline.exe -help'
+    WRITE(*,*) ''
+END SUBROUTINE PRINT_USAGE
+
 END PROGRAM run_teb_offline
+
