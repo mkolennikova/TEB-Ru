@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 import f90nml
 import glob
 
@@ -7,8 +8,9 @@ def read_output (output_dir, namelist_path):
 
   output_df = pd.DataFrame()
   for out_file in file_paths:
-    param = pd.read_csv(output_dir+'/'+out_file, header=None)
-    output_df[out_file[:-4]] = param
+    var_name = os.path.basename(out_file).split('.')[0]
+    var_data = pd.read_csv(out_file, header=None)
+    output_df[var_name] = var_data
 
   namelist = f90nml.read(namelist_path)
 
