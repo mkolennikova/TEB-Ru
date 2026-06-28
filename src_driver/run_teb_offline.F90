@@ -644,11 +644,6 @@ IF (rc > 0) THEN
     WRITE(*,*) 'IOSTAT = ', rc
     WRITE(*,*) 'Attempting to continue...'
     CALL SLEEP(2)  ! Pause for 2 second
-ELSE IF (rc < 0) THEN
-    WRITE(*,*) 'WARNING: End of file reached while reading forcing namelist: ', TRIM(namelist_forcing_path_local)
-    WRITE(*,*) 'IOSTAT = ', rc
-    WRITE(*,*) 'Attempting to continue...'
-    CALL SLEEP(2)  ! Pause for 2 second
 END IF
 CLOSE(fu)
 forcing_path2=trim(forcing_path)
@@ -673,11 +668,6 @@ END IF
 READ(nml=tebparam, iostat=rc, unit=fu)
 IF (rc > 0) THEN
     WRITE(*,*) 'WARNING: Issues reading parameter namelist from: ', TRIM(namelist_path_local)
-    WRITE(*,*) 'IOSTAT = ', rc
-    WRITE(*,*) 'Attempting to continue...'
-    CALL SLEEP(2)  ! Pause for 2 second
-ELSE IF (rc < 0) THEN
-    WRITE(*,*) 'WARNING: End of file reached while reading parameter namelist: ', TRIM(namelist_path_local)
     WRITE(*,*) 'IOSTAT = ', rc
     WRITE(*,*) 'Attempting to continue...'
     CALL SLEEP(2)  ! Pause for 2 second
