@@ -600,12 +600,24 @@ teb_rd_irrig_sum(:)     = 1.         ! 24h quantity of water used for road water
 !===========================================================================
 !===========================================================================
 ! Read from file.
-open (action='read', file=namelist_forcing_path_local, iostat=rc, newunit=fu)
-read (nml=tebforcing, iostat=rc, unit=fu)
-IF (rc > 0) THEN
-    WRITE(*,*) 'ERROR: Failed to read forcing namelist from: ', TRIM(namelist_forcing_path_local)
+OPEN(action='read', file=namelist_forcing_path_local, iostat=rc, newunit=fu)
+IF (rc /= 0) THEN
+    WRITE(*,*) 'ERROR: Cannot open forcing namelist file: ', TRIM(namelist_forcing_path_local)
     WRITE(*,*) 'IOSTAT = ', rc
-    STOP
+    STOP 1
+END IF
+
+READ(nml=tebforcing, iostat=rc, unit=fu)
+IF (rc > 0) THEN
+    WRITE(*,*) 'WARNING: Issues reading forcing namelist from: ', TRIM(namelist_forcing_path_local)
+    WRITE(*,*) 'IOSTAT = ', rc
+    WRITE(*,*) 'Attempting to continue...'
+    CALL SLEEP(1)  ! Pause for 1 second
+ELSE IF (rc < 0) THEN
+    WRITE(*,*) 'WARNING: End of file reached while reading forcing namelist: ', TRIM(namelist_forcing_path_local)
+    WRITE(*,*) 'IOSTAT = ', rc
+    WRITE(*,*) 'Attempting to continue...'
+    CALL SLEEP(1)  ! Pause for 1 second
 END IF
 CLOSE(fu)
 forcing_path2=trim(forcing_path)
@@ -616,13 +628,28 @@ forcing_path2=trim(forcing_path)
 !===========================================================================
 !===========================================================================
 				
+!===========================================================================
+! READ NAMELIST PARAMETERS
+!===========================================================================
 ! Read from file.
-open (action='read', file=namelist_path_local, iostat=rc, newunit=fu)
-read (nml=tebparam, iostat=rc, unit=fu)
-IF (rc > 0) THEN
-    WRITE(*,*) 'ERROR: Failed to read parameter namelist from: ', TRIM(namelist_path_local)
+OPEN(action='read', file=namelist_path_local, iostat=rc, newunit=fu)
+IF (rc /= 0) THEN
+    WRITE(*,*) 'ERROR: Cannot open parameter namelist file: ', TRIM(namelist_path_local)
     WRITE(*,*) 'IOSTAT = ', rc
-    STOP
+    STOP 1
+END IF
+
+READ(nml=tebparam, iostat=rc, unit=fu)
+IF (rc > 0) THEN
+    WRITE(*,*) 'WARNING: Issues reading parameter namelist from: ', TRIM(namelist_path_local)
+    WRITE(*,*) 'IOSTAT = ', rc
+    WRITE(*,*) 'Attempting to continue...'
+    CALL SLEEP(1)  ! Pause for 1 second
+ELSE IF (rc < 0) THEN
+    WRITE(*,*) 'WARNING: End of file reached while reading parameter namelist: ', TRIM(namelist_path_local)
+    WRITE(*,*) 'IOSTAT = ', rc
+    WRITE(*,*) 'Attempting to continue...'
+    CALL SLEEP(1)  ! Pause for 1 second
 END IF
 CLOSE(fu)
 
