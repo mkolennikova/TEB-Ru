@@ -29,6 +29,37 @@ Compared to the original TEB model, TEB-Ru includes:
 - **Flexible mode switching** between standalone and coupled operation
 - **Python library suite** for preparing atmospheric forcing data, including utilities for processing meteorological observations, reanalysis data, and generating input files for offline simulations
 
+### Quick Start
+
+#### Option 1: Google Colab (Recommended)
+
+Open and run the [`run_in_collab.ipynb`](https://github.com/mkolennikova/TEB-Ru/blob/main/run_in_collab.ipynb) notebook in Google Colab. It will automatically:
+
+1. Clone the repository
+2. Set up the environment
+3. Compile the model
+4. Run a test simulation
+5. Visualize results
+
+#### Option 2: Local Build
+
+To build and run TEB-Ru locally:
+
+```bash
+# Clone the repository
+git clone https://github.com/mkolennikova/TEB-Ru.git
+cd TEB-Ru
+
+# Check compiler flags in gfortran_args
+# The model automatically detects ifort or gfortran
+
+# Build the model
+make clean
+make
+
+# Run the model
+./TEB_offline.exe
+
 ## Configuration
 
 Model configuration is controlled through Fortran namelist files in the [`namelist/`](https://github.com/mkolennikova/TEB-Ru/tree/main/namelist) directory:
