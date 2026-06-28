@@ -343,10 +343,10 @@ CHARACTER(:), allocatable         :: forcing_path2  ! Forcing filepath with adju
 ! NAMELIST declarations
 !===========================================================================
 
-NAMELIST /tebforcing/ forcing_path, dt, lon_teb, lat_teb, hlev_teb, teb_year,          &
+NAMELIST /tebforcing/ forcing_path, lon_teb, lat_teb, hlev_teb, teb_year,          &
                       teb_month, teb_day, teb_hour, teb_min, nsteps, forc_step
 
-NAMELIST /tebparam/ urb_h_bld, urb_fr_bld, fr_garden, urb_h2w, teb_road_dir,           &
+NAMELIST /tebparam/ dt, urb_h_bld, urb_fr_bld, fr_garden, urb_h2w, teb_road_dir,           &
                     teb_hroad_dir, teb_wall_opt, teb_ti_bld, teb_qi_bld,               &
 					urb_alb_rf_so, urb_alb_rf_th, urb_hcap_rf, urb_hcon_rf,            &
 					urb_alb_rd_so, urb_alb_rd_th, urb_hcap_rd, urb_hcon_rd,            &

@@ -6,8 +6,8 @@
  teb_year=2004,
  teb_month=2,
  teb_day=20,
- teb_hour=0.,
- teb_min=0.,
+ teb_hour=0,
+ teb_min=0,
  nsteps=18000,
- forc_step=1800.,
+ forc_step=1800
 /
