@@ -48,6 +48,11 @@ USE MODD_FORC_ATM, ONLY: CSV         ,&! name of all scalar variables
 
 IMPLICIT NONE
 
+! Program arguments
+INTEGER :: num_args
+CHARACTER(LEN=100) :: arg1, arg2
+LOGICAL :: arg1_exists, arg2_exists
+
 INTEGER :: nsteps                            !IN Number of timesteps
 INTEGER :: JSURF_STEP                        ! Driver loop index
 INTEGER :: INB_ATM                           ! number time the driver calls the TEB
@@ -325,8 +330,12 @@ CHARACTER(LEN=*), PARAMETER       :: SOLAR_PROD = 'output/SOLAR_PROD.txt'
 ! Namelist paths                                                                            
 ! -----------------------------------------------------------                                      
 INTEGER                           :: fu, rc
-CHARACTER(LEN=*), PARAMETER       :: namelist_path = 'namelist/namelist.nml'
-CHARACTER(LEN=*), PARAMETER       :: namelist_forcing_path = 'namelist/namelist_forcing.nml'
+CHARACTER(LEN=*), PARAMETER       :: namelist_path_default = 'namelist/namelist.nml'
+CHARACTER(LEN=*), PARAMETER       :: namelist_forcing_path_default = 'namelist/namelist_forcing.nml'
+CHARACTER(LEN=100)                :: namelist_path_local
+CHARACTER(LEN=100)                :: namelist_forcing_path_local
+
+
 CHARACTER(LEN=100)                :: forcing_path   ! Forcing filepath that we read from namelist
 CHARACTER(:), allocatable         :: forcing_path2  ! Forcing filepath with adjusted length
 
@@ -359,7 +368,60 @@ NAMELIST /tebparam/ urb_h_bld, urb_fr_bld, fr_garden, urb_h2w, teb_road_dir,    
 !============================================================
 !============================================================
 !============================================================
-! Basic Settings of Location and Forcing
+
+
+!===========================================================================
+! Process command line arguments
+!===========================================================================
+num_args = COMMAND_ARGUMENT_COUNT()
+
+! Set default paths
+namelist_path_local = TRIM(namelist_path_default)
+namelist_forcing_path_local = TRIM(namelist_forcing_path_default)
+
+! Check if arguments were provided
+IF (num_args >= 1) THEN
+    CALL GET_COMMAND_ARGUMENT(1, arg1)
+    arg1_exists = .TRUE.
+    namelist_forcing_path_local = TRIM(arg1)
+ELSE
+    arg1_exists = .FALSE.
+END IF
+
+IF (num_args >= 2) THEN
+    CALL GET_COMMAND_ARGUMENT(2, arg2)
+    arg2_exists = .TRUE.
+    namelist_path_local = TRIM(arg2)
+ELSE
+    arg2_exists = .FALSE.
+END IF
+
+! Print usage information if more than 2 arguments
+IF (num_args > 2) THEN
+    WRITE(*,*) 'Usage: ./TEB_offline.exe [namelist_forcing_path] [namelist_path]'
+    WRITE(*,*) '  If no arguments provided, default paths are used:'
+    WRITE(*,*) '    namelist_forcing_path = ', TRIM(namelist_forcing_path_default)
+    WRITE(*,*) '    namelist_path         = ', TRIM(namelist_path_default)
+    WRITE(*,*) '  If one argument provided, it is used as forcing namelist path.'
+    WRITE(*,*) '  If two arguments provided, first is forcing namelist, second is parameter namelist.'
+    STOP
+END IF
+
+! Print information about which files are being used
+WRITE(*,*) '----------------------------------------------------'
+WRITE(*,*) 'TEB-Ru Offline Model'
+IF (num_args == 0) THEN
+    WRITE(*,*) 'Using default namelist files:'
+ELSE IF (num_args == 1) THEN
+    WRITE(*,*) 'Using custom forcing namelist file:'
+ELSE
+    WRITE(*,*) 'Using custom namelist files:'
+END IF
+WRITE(*,*) '  Forcing namelist: ', TRIM(namelist_forcing_path_local)
+WRITE(*,*) '  Parameter namelist: ', TRIM(namelist_path_local)
+WRITE(*,*) '----------------------------------------------------'
+
+                    ! Basic Settings of Location and Forcing
 !============================================================
 !============================================================
 lon_teb(:)        = 1.3              ! Longitude (deg)
@@ -538,8 +600,13 @@ teb_rd_irrig_sum(:)     = 1.         ! 24h quantity of water used for road water
 !===========================================================================
 !===========================================================================
 ! Read from file.
-open (action='read', file=namelist_forcing_path, iostat=rc, newunit=fu)
+open (action='read', file=namelist_forcing_path_local, iostat=rc, newunit=fu)
 read (nml=tebforcing, iostat=rc, unit=fu)
+IF (rc /= 0) THEN
+    WRITE(*,*) 'ERROR: Failed to read forcing namelist from: ', TRIM(namelist_forcing_path_local)
+    STOP
+END IF
+CLOSE(fu)
 forcing_path2=trim(forcing_path)
 
 !===========================================================================
@@ -549,8 +616,13 @@ forcing_path2=trim(forcing_path)
 !===========================================================================
 				
 ! Read from file.
-open (action='read', file=namelist_path, iostat=rc, newunit=fu)
+open (action='read', file=namelist_path_local, iostat=rc, newunit=fu)
 read (nml=tebparam, iostat=rc, unit=fu)
+IF (rc /= 0) THEN
+    WRITE(*,*) 'ERROR: Failed to read parameter namelist from: ', TRIM(namelist_path_local)
+    STOP
+END IF
+CLOSE(fu)
 
 !===========================================================================
 !===========================================================================
