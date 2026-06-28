@@ -38,14 +38,14 @@ Open and run the [`run_in_collab.ipynb`](https://github.com/mkolennikova/TEB-Ru/
 1. Clone the repository
 2. Set up the environment
 3. Compile the model
-4. Run a test simulation
-5. Visualize results
+4. Download meteorological forcing 
+5. Run a test simulation
+6. Visualize results
 
 #### Option 2: Local Build
 
 To build and run TEB-Ru locally:
 
-```bash
 # Clone the repository
 git clone https://github.com/mkolennikova/TEB-Ru.git
 cd TEB-Ru
