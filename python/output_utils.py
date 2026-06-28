@@ -210,9 +210,10 @@ def preview_output_mpl(df, subplots_config=None, figsize=(10, 18),
 
 
 def preview_output_plotly(df, subplots_config=None, save_path=None, height=None,
-                          start=None, end=None, vertical_spacing=0.03, layout_kwargs=None):
+                          start=None, end=None, vertical_spacing=0.03, 
+                          layout_kwargs=None, legend_side='right'):
     """
-    Preview TEB-Ru outputs using Plotly (interactive).
+    Preview TEB-Ru outputs using Plotly (interactive) with grouped vertical legend.
     
     Parameters:
     -----------
@@ -232,6 +233,8 @@ def preview_output_plotly(df, subplots_config=None, save_path=None, height=None,
         Vertical spacing between subplots (default 0.03).
     layout_kwargs : dict, optional
         Additional layout parameters for fig.update_layout().
+    legend_side : str, optional
+        Legend placement: 'right' (default) or 'left'.
     
     Returns:
     --------
@@ -262,6 +265,14 @@ def preview_output_plotly(df, subplots_config=None, save_path=None, height=None,
     
     x = df_plot.index
     
+    # Determine legend position
+    if legend_side == 'right':
+        legend_x = 1.02
+        legend_xanchor = 'left'
+    else:  # 'left'
+        legend_x = -0.02
+        legend_xanchor = 'right'
+    
     for row_idx, config in enumerate(subplots_config, start=1):
         variables = config.get('variables', [])
         ylabel = config.get('ylabel', '')
@@ -269,6 +280,7 @@ def preview_output_plotly(df, subplots_config=None, save_path=None, height=None,
         colors = config.get('colors', None)
         linestyles = config.get('linestyles', None)
         linewidths = config.get('linewidths', None)
+        group_title = config.get('title', f'Subplot {row_idx}')
         
         # Filter valid variables
         valid_vars = [v for v in variables if v in df_plot.columns and not df_plot[v].isna().all()]
@@ -309,7 +321,7 @@ def preview_output_plotly(df, subplots_config=None, save_path=None, height=None,
             if len(linewidths) != len(valid_vars):
                 linewidths = [2] * len(valid_vars)
         
-        # Add traces
+        # Add traces with legend group and group title
         for var, label, color, ls, lw in zip(valid_vars, leg_labels, colors, linestyles, linewidths):
             fig.add_trace(
                 go.Scatter(
@@ -317,6 +329,8 @@ def preview_output_plotly(df, subplots_config=None, save_path=None, height=None,
                     y=df_plot[var],
                     mode='lines',
                     name=label,
+                    legendgroup=f"group_{row_idx}",
+                    legendgrouptitle_text=group_title if row_idx == 1 else None,  # only first trace per group sets title
                     line=dict(color=color, dash=ls, width=lw)
                 ),
                 row=row_idx, col=1
@@ -328,12 +342,28 @@ def preview_output_plotly(df, subplots_config=None, save_path=None, height=None,
     # Update x-axis label on the last subplot
     fig.update_xaxes(title_text='Time', row=n_rows, col=1)
     
-    # Base layout
+    # Base layout with vertical legend on the side
     base_layout = {
         'height': height,
         'showlegend': True,
-        'legend': dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-        'hovermode': 'x unified'
+        'legend': dict(
+            orientation='v',
+            yanchor='middle',
+            y=0.5,
+            xanchor=legend_xanchor,
+            x=legend_x,
+            itemclick='toggleothers',
+            itemdoubleclick='toggle',
+            groupclick='toggleitem',
+            font=dict(size=10)
+        ),
+        'hovermode': 'x unified',
+        'margin': dict(
+            l=80 if legend_side == 'left' else 60,
+            r=80 if legend_side == 'right' else 60,
+            t=60,
+            b=60
+        )
     }
     
     # Merge with user-provided layout_kwargs
