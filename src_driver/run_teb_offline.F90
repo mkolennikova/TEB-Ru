@@ -602,8 +602,9 @@ teb_rd_irrig_sum(:)     = 1.         ! 24h quantity of water used for road water
 ! Read from file.
 open (action='read', file=namelist_forcing_path_local, iostat=rc, newunit=fu)
 read (nml=tebforcing, iostat=rc, unit=fu)
-IF (rc /= 0) THEN
+IF (rc > 0) THEN
     WRITE(*,*) 'ERROR: Failed to read forcing namelist from: ', TRIM(namelist_forcing_path_local)
+    WRITE(*,*) 'IOSTAT = ', rc
     STOP
 END IF
 CLOSE(fu)
@@ -618,8 +619,9 @@ forcing_path2=trim(forcing_path)
 ! Read from file.
 open (action='read', file=namelist_path_local, iostat=rc, newunit=fu)
 read (nml=tebparam, iostat=rc, unit=fu)
-IF (rc /= 0) THEN
+IF (rc > 0) THEN
     WRITE(*,*) 'ERROR: Failed to read parameter namelist from: ', TRIM(namelist_path_local)
+    WRITE(*,*) 'IOSTAT = ', rc
     STOP
 END IF
 CLOSE(fu)
