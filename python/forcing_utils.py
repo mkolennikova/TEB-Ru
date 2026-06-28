@@ -14,7 +14,7 @@ def write_forcing(df4point, save_dir):
         if 'Forc_' in var:
             np.savetxt(save_dir + var + '.txt', df4point[var].to_numpy(), '%.5f')
 
-def plot_forcing(df, title=None, save_path=None, figsize=(14, 10), resample='auto'):
+def plot_forcing_mpl(df, title=None, save_path=None, figsize=(14, 10), resample='auto'):
     """
     Plot forcing variables from ERA5.
 
@@ -138,7 +138,7 @@ def prepare_namelist(
     lat,
     hlev,
     df,
-    forcing_path='forcing/',
+    forcing_path='forcing_txt/',
     output_dir='.',
     filename='namelist_forcing.nml'):
     """

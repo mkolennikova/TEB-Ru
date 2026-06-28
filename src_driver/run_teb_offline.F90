@@ -899,7 +899,7 @@ CLOSE(27)
 !
     WRITE(*,*) ' '
     WRITE(*,*) '    --------------------------'
-    WRITE(*,*) '    |  DRIVER ENDS CORRECTLY |'
+    WRITE(*,*) '    |  TEB-Ru OFFLINE SIMULATION ENDS CORRECTLY |'
     WRITE(*,*) '    --------------------------'
     WRITE(*,*) ' '
 !

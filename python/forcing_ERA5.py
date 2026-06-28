@@ -8,7 +8,7 @@ import shutil
 import numpy as np
 import pandas as pd
 import xarray as xr
-from forcing_utils import plot_forcing, write_forcing, prepare_namelist
+from forcing_utils import plot_forcing_mpl, write_forcing, prepare_namelist
 
 
 from pathlib import Path
@@ -405,9 +405,9 @@ def prepare_forcing(
     # ------------------------------------------------------------------
     # 1. Create directory structure
     # ------------------------------------------------------------------
-    base_path = Path(base_dir)
-    netcdf_dir = base_path / 'netcdf'
-    forcing_dir = base_path / 'forcing'
+    base_path = Path(base_dir) / 'forcing_ERA5'
+    netcdf_dir = base_path / 'forcing_nc'
+    forcing_dir = base_path / 'forcing_txt'
     netcdf_dir.mkdir(parents=True, exist_ok=True)
     forcing_dir.mkdir(parents=True, exist_ok=True)
 
@@ -484,7 +484,7 @@ def prepare_forcing(
             print("📈 Generating plot...")
         if plot_title is None:
             plot_title = f"ERA5 Forcing: ({lat:.2f}, {lon:.2f})  {start_date} to {end_date}"
-        plot_forcing(
+        plot_forcing_mpl(
             df_sorted,
             title=plot_title,
             save_path=str(plot_file),
