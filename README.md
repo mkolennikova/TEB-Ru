@@ -69,7 +69,7 @@ Model configuration is controlled through Fortran namelist files in the [`nameli
 - **[namelist_forcing.nml](https://github.com/mkolennikova/TEB-Ru/blob/main/namelist/namelist_forcing.nml)** – Atmospheric forcing parameters (temperature, humidity, wind, radiation, precipitation, etc.)
 - **[namelist.nml](https://github.com/mkolennikova/TEB-Ru/blob/main/namelist/namelist.nml)** – Urban geometry, material properties, BEM parameters, vegetation settings, and other model options
 
-Description of model options from [namelist.nml](https://github.com/mkolennikova/TEB-Ru/blob/main/namelist/namelist.nml), as wel as model output variables is avaible in [here](https://github.com/mkolennikova/TEB-Ru/blob/main/TEB_Ru_variables_description.xlsx). 
+Description of model options from [namelist.nml](https://github.com/mkolennikova/TEB-Ru/blob/main/namelist/namelist.nml), as wel as model output variables is avaible in [here](https://github.com/mkolennikova/TEB-Ru/blob/main/TEB_Ru_variables_description.md). 
 
 ### Compiler Flags
 
