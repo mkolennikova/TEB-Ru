@@ -957,7 +957,7 @@ IF (ntstep == 1) THEN
 	ZALB_WIN       = XUNDEF
 	ZNATVENT       = 0.           ! flag to describe surventilation system for i/o 
                                        ! 0 for NONE, 1 for MANU and 2 for AUTO
-	#LSHADE         = .FALSE.      ! Are shading devices being used ?
+	!LSHADE         = .FALSE.      ! Are shading devices being used ?
 	ZSHADE         = 0.           ! flag to activate shading devices -> REAL for i/o 0. or 1	
     GSHAD_DAY      = .FALSE.      ! has shading been necessary this day ?
     GNATVENT_NIGHT = .FALSE.      ! has natural ventilation been necessary/possible this night ?	
