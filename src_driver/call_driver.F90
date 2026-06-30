@@ -971,6 +971,77 @@ IF (ntstep == 1) THEN
 	! For (Wang, 2012) Wind Calculation
 	ZUSTAR_TOWN         = 0.2 
 	
+	IF (icell .EQ. 1 .AND. iblock .EQ. 1) THEN
+		!-------------------------------------------------------------------
+		! Print configuration parameters (only on first time step)
+		!-------------------------------------------------------------------
+		PRINT*, '=================================================='
+		PRINT*, 'TEB-Ru Configuration Parameters (from namelists):'
+		PRINT*, '  Geometry:'
+		PRINT*, '    ZBLD          = ', ZBLD(1)
+		PRINT*, '    ZGARDEN       = ', ZGARDEN(1)
+		PRINT*, '    ZCAN_HW_RATIO = ', ZCAN_HW_RATIO(1)
+		PRINT*, '    ZBLD_HEIGHT   = ', ZBLD_HEIGHT(1)
+		PRINT*, '    ZROAD_DIR     = ', ZROAD_DIR(1)
+		PRINT*, '    HROAD_DIR     = ', HROAD_DIR
+		PRINT*, '    HWALL_OPT     = ', HWALL_OPT
+		PRINT*, '  Thermal properties:'
+		PRINT*, '    ZHC_ROAD_S    = ', ZHC_ROAD_S(1)
+		PRINT*, '    ZHC_ROOF_S    = ', ZHC_ROOF_S(1)
+		PRINT*, '    ZHC_WALL_S    = ', ZHC_WALL_S(1)
+		PRINT*, '    ZTC_ROAD_S    = ', ZTC_ROAD_S(1)
+		PRINT*, '    ZTC_ROOF_S    = ', ZTC_ROOF_S(1)
+		PRINT*, '    ZTC_WALL_S    = ', ZTC_WALL_S(1)
+		PRINT*, '    ZALB_ROAD     = ', ZALB_ROAD(1)
+		PRINT*, '    ZALB_ROOF     = ', ZALB_ROOF(1)
+		PRINT*, '    ZALB_WALL     = ', ZALB_WALL(1)
+		PRINT*, '    ZEMIS_ROAD    = ', ZEMIS_ROAD(1)
+		PRINT*, '    ZEMIS_ROOF    = ', ZEMIS_ROOF(1)
+		PRINT*, '    ZEMIS_WALL    = ', ZEMIS_WALL(1)
+		PRINT*, '  BEM parameters:'
+		PRINT*, '    CBEM          = ', CBEM
+		PRINT*, '    LBEM_AC       = ', LBEM_AC
+		PRINT*, '    ZTCOOL_TARGET = ', ZTCOOL_TARGET(1)
+		PRINT*, '    ZTHEAT_TARGET = ', ZTHEAT_TARGET(1)
+		PRINT*, '    ZV_VENT       = ', ZV_VENT(1)
+		PRINT*, '    ZINF          = ', ZINF(1)
+		PRINT*, '    ZCOP_RAT      = ', ZCOP_RAT(1)
+		PRINT*, '    ZGR           = ', ZGR(1)
+		PRINT*, '    ZRESIDENTIAL  = ', ZRESIDENTIAL(1)
+		PRINT*, '    ZDT_RES       = ', ZDT_RES
+		PRINT*, '    ZDT_OFF       = ', ZDT_OFF
+		PRINT*, '    ZCAP_SYS_HEAT = ', ZCAP_SYS_HEAT(1)
+		PRINT*, '    HNATVENT      = ', HNATVENT
+		PRINT*, '    CCOOL_COIL    = ', CCOOL_COIL
+		PRINT*, '    CHEAT_COIL    = ', CHEAT_COIL
+		PRINT*, '  Green roofs:'
+		PRINT*, '    LGREENROOF    = ', LGREENROOF
+		PRINT*, '    ZFRAC_GR      = ', ZFRAC_GR(1)
+		PRINT*, '    LGREENROOF_EXT= ', LGREENROOF_EXT
+		PRINT*, '  Gardens:'
+		PRINT*, '    LGARDEN       = ', LGARDEN
+		PRINT*, '    LGARDEN_EXT   = ', LGARDEN_EXT
+		PRINT*, '  Solar panels:'
+		PRINT*, '    LSOLAR_PANEL  = ', LSOLAR_PANEL
+		PRINT*, '    ZFRAC_PANEL   = ', ZFRAC_PANEL(1)
+		PRINT*, '  Irrigation:'
+		PRINT*, '    LPAR_RD_IRRIG = ', LPAR_RD_IRRIG
+		PRINT*, '    ZRD_START_MONTH = ', ZRD_START_MONTH(1)
+		PRINT*, '    ZRD_END_MONTH   = ', ZRD_END_MONTH(1)
+		PRINT*, '    ZRD_START_HOUR  = ', ZRD_START_HOUR(1)
+		PRINT*, '    ZRD_END_HOUR    = ', ZRD_END_HOUR(1)
+		PRINT*, '    ZRD_24H_IRRIG   = ', ZRD_24H_IRRIG(1)
+		PRINT*, '  Wind:'
+		PRINT*, '    ITYPE_WIND    = ', ITYPE_WIND(1)
+		PRINT*, '    ZFAI          = ', ZFAI(1,:)
+		PRINT*, '  Anthropogenic heat:'
+		PRINT*, '    ZH_TRAFFIC    = ', ZH_TRAFFIC(1)
+		PRINT*, '    ZH_INDUSTRY   = ', ZH_INDUSTRY(1)
+		PRINT*, '    ZUTC_HOUR     = ', ZUTC_HOUR
+		PRINT*, '  Shading flag:'
+		PRINT*, '    LSHADE        = ', LSHADE
+		PRINT*, '=================================================='
+	END IF
 ENDIF
 
 !===========================================================================
